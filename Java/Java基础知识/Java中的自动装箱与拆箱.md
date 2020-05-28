@@ -1,16 +1,19 @@
 # Java中的自动装箱与拆箱
 @(Java)[基础知识]
+
 [Java中的自动装箱与拆箱 - 技术小黑屋](https://droidyue.com/blog/2015/04/07/autoboxing-and-autounboxing-in-java/)
+
 [自动拆箱&自动装箱以及String和基本数据类型封装类生成的对象是否相等](https://blog.csdn.net/u010126792/article/details/61616412)
+
 [Integer缓存池（IntegerCache）及整型缓存池](https://blog.csdn.net/maihilton/article/details/80101497)
 
-自动装箱和拆箱在 Java 中很常见，比如我们有一个方法，接受一个对象类型的参数，如果我们传递一个原始类型值，那么Java会自动讲这个原始类型值转换成与之对应的对象。最经典的一个场景就是当我们向 ArrayList 这样的容器中增加原始类型数据时或者是创建一个参数化的类。
+自动装箱和拆箱在 Java 中很常见，比如我们有一个方法，接受一个对象类型的参数，如果我们传递一个原始类型值，那么 Java 会自动讲这个原始类型值转换成与之对应的对象。最经典的一个场景就是当我们向 ArrayList 这样的容器中增加原始类型数据时或者是创建一个参数化的类。
 
 赋值时：这是最常见的一种情况，在 Java 1.5 以前我们需要手动地进行转换才行，而现在所有的转换都是由编译器来完成。
 
-对于基本类型（原始类型）：`boolean`, `char`, `byte`, `short`, `int`, `long`, `float`, `double`来说，并不存在对象一说，所有生成的过程均为（以`int`为例）：
+对于基本类型（原始类型）：`boolean`, `char`, `byte`, `short`, `int`, `long`, `float`, `double`来说，不是对象类型所以不会生成对象，所有生成的过程均为（以`int`为例）：
 ```plain
-iconst_1 		// [-1， 5] 
+iconst_1 		// [-1, 5] 
 istore_1 
 bipush        6 // 小于-1或大于5时 
 istore_2 
@@ -23,20 +26,22 @@ public static native int identityHashCode(Object x);
 ```java
 int a = 127;
 int b = 127;
-System.out.println(System.identityHashCode(a)); // 739498517
-System.out.println(System.identityHashCode(b)); // 739498517
+System.out.println(System.identityHashCode(a));		// 739498517
+System.out.println(System.identityHashCode(b));		// 739498517
+System.out.println(System.identityHashCode(127));	// 739498517
 
 int c = 128;
 int d = 128;
-System.out.println(System.identityHashCode(c)); // 125130493
-System.out.println(System.identityHashCode(d)); // 914504136
+System.out.println(System.identityHashCode(c));		// 125130493
+System.out.println(System.identityHashCode(d));		// 914504136
+System.out.println(System.identityHashCode(128));	// 166239592
 ```
 对于引用类型（包装类型）：`Boolean`, `Character`, `Byte`,` Short`, `Integer`, `Long` 默认自动装箱池范围为小于等于 1 个`byte`（0 ~ 0xff, -128 ~ 127），当新建对象的值在该范围内时，程序会在自动装箱池（缓存池）`static final Object cache[]`中通过`intValue()`查找相同值的对象，如果有则直接返回该对象，否则初始化新的对象并存入自动装箱池。之后便不会再生成新的等于该值的对象，而是直接自动装箱池中的等于该值的对象。在其生成新的对象时，会有`private final int value`的成员变量一起生成，`intValue()`方法返回的就是这个变量。
  注意：浮点类型`Float`, `Double` 没有缓存。
 ```java
 // 字面值大于0xff时
 Integer a = new Integer(128);
-Integer b = new Integer(128);
+Integer b = new Integer(128); // 新建对象，无论如何地址都不同
 int c = a.intValue();
 int d = b.intValue();
 Integer e = 128;			// 将 int 通过 valueOf() 自动装箱成 Integer
@@ -53,7 +58,7 @@ System.out.println(System.identityHashCode(f)); // 385242642
 ```java
 // 字面值小于等于0xff时
 Integer a = new Integer(127);
-Integer b = new Integer(127);
+Integer b = new Integer(127); // 新建对象，无论如何地址都不同
 int c = a.intValue();
 int d = b.intValue();
 Integer e = 127;			// 将 int 通过 valueOf() 自动装箱成 Integer
@@ -66,8 +71,9 @@ System.out.println(System.identityHashCode(d)); // 914504136
 System.out.println(System.identityHashCode(e)); // 914504136
 System.out.println(System.identityHashCode(f));	// 914504136
 ```
+从 Java 9 开始通过构造器生成对象的方式`Integer i = new Integer(127)`已经过时，此方法必定会在堆中生成新的对象，相同值生成的两个对象地址不同。现在采用静态方法`Integer i = Integer.valueOf(127)`，先在自动装箱池中查找有无已经生成并且值相同的对象，有则直接返回，否则才通过构造器生成。
 
-对于`Integer`类型的变量，可以通过 JVM 参数`--XX:AutoBoxCacheMax=<size>`调整自动装箱池的范围为 [-size-1~size]，但是其他基本数据类型的自动装箱池范围不可变。
+对于`Integer`类型的变量，可以通过 JVM 参数`--XX:AutoBoxCacheMax=<size>`调整自动装箱池的范围为 [-size-1, size]，但是其他基本数据类型的自动装箱池范围不可变。
 
 注意：自动装箱和自动拆箱不会影响函数的重载，使涉及重载的函数变为同一个函数。例如：
 ```java
