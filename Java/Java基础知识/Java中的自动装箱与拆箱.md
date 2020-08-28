@@ -1,4 +1,4 @@
-#Java中的自动装箱与拆箱
+# Java中的自动装箱与拆箱
 @(Java)[基础知识]
 
 [Java中的自动装箱与拆箱 - 技术小黑屋](https://droidyue.com/blog/2015/04/07/autoboxing-and-autounboxing-in-java/)
@@ -9,17 +9,19 @@
 
 [Java常量池理解与总结](https://www.jianshu.com/p/c7f47de2ee80)
 
-##基本类型
+## 基本类型
+
 自动装箱和拆箱在 Java 中很常见，比如我们有一个方法，接受一个对象类型的参数，如果我们传递一个原始类型值，那么 Java 会自动讲这个原始类型值转换成与之对应的对象。最经典的一个场景就是当我们向 ArrayList 这样的容器中增加原始类型数据时或者是创建一个参数化的类。
 
 > 装箱（boxing）：int → Integer
+>
 > 拆箱（unboxing）：Integer → int
 
 赋值时：这是最常见的一种情况，在 Java 1.5 以前我们需要手动地进行转换才行，而现在所有的转换都是由编译器来完成。
 
 对于基本类型（原始类型）：`boolean`, `char`, `byte`, `short`, `int`, `long`, `float`, `double`来说，不是对象类型所以不会生成对象，所有生成的过程均为（以`int`为例）：
 ```plain
-iconst_1 		// [-1, 5] 
+iconst_1        // [-1, 5] 
 istore_1 
 bipush        6 // 小于-1或大于5时 
 istore_2 
@@ -113,7 +115,7 @@ public int add(int x) {
 	return x;
 }
 ```
-##字符串类型
+## 字符串类型
 `String`是`final`修饰的类型，不可继承（区别于不可变类）：
 
 > 当你将final用于类身上时，一个final类是无法被任何人继承的，那也就意味着此类在一个继承树中是一个叶子类，并且此类的设计已被认为很“完美”而不需要进行修改或扩展。对于final类中的成员，你可以定义其为final，也可以不是final。而对于方法，由于所属类为final的关系，自然也就成了final型的。
@@ -121,7 +123,7 @@ public int add(int x) {
 `String`与`Integer`等基本类型的包装类一样是[不可变类（Immutable Class）](https://www.jianshu.com/p/48b011688edc)，成员变量被`final`修饰过不可更改。作为参数传入一个方法后，里面的修改（会创建一个新对象）不影响外面。
 
 > 不可变类只是其实例不能被修改的类，每个实例中包含的所有信息都必须在创建该实例的时候就提供，并在对象的整个生命周期内固定不变。
-
+>
 > 要创建不可变类，只要遵循下面几条规则：
 > 1. 不要提供任何会修改对象状态的方法。
 > 2. 保证类不会被拓展（一般声明为final即可）。
@@ -201,7 +203,7 @@ System.out.println(System.identityHashCode(s3.intern())); // 874088044 尝试添
 
 ```
 
-###`String`,`StringBuilder`和`StringBuffer`
+### `String`,`StringBuilder`和`StringBuffer`
 - `String`：不可变类，用“+”连接时较慢（详见拘留池）
 - `StringBuilder`：可变类，非线程安全，较快，比`StringBuffer`快10%~15%
 - `StringBuffer`：可变类，线程安全（同步锁）
