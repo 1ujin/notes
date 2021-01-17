@@ -1,4 +1,4 @@
-#Java中的自动装箱与拆箱
+# Java中的自动装箱与拆箱
 
 @(Java)[基础知识]
 
@@ -11,7 +11,7 @@
 	- [`String`, `StringBuilder`和`StringBuffer`](#string-stringbuilder和stringbuffer)
 
 ---
-##引用
+## 引用
 [Java中的自动装箱与拆箱 - 技术小黑屋](https://droidyue.com/blog/2015/04/07/autoboxing-and-autounboxing-in-java/)
 
 [自动拆箱&自动装箱以及String和基本数据类型封装类生成的对象是否相等](https://blog.csdn.net/u010126792/article/details/61616412)
@@ -25,7 +25,7 @@
 [Java中几种常量池的区分](http://tangxman.github.io/2015/07/27/the-difference-of-java-string-pool/)
 
 ---
-##基本数据类型
+## 基本数据类型
 
 自动装箱和拆箱在 Java 中很常见，比如我们有一个方法，接受一个对象类型的参数，如果我们传递一个原始类型值，那么 Java 会自动讲这个原始类型值转换成与之对应的对象。最经典的一个场景就是当我们向 ArrayList 这样的容器中增加原始类型数据时或者是创建一个参数化的类。
 
@@ -146,7 +146,7 @@ public int add(int x) {
 ```
 
 ---
-##字符串类型
+## 字符串类型
 `String`是`final`修饰的类型，不可继承（区别于不可变类）：
 
 > 当你将final用于类身上时，一个final类是无法被任何人继承的，那也就意味着此类在一个继承树中是一个叶子类，并且此类的设计已被认为很“完美”而不需要进行修改或扩展。对于final类中的成员，你可以定义其为final，也可以不是final。而对于方法，由于所属类为final的关系，自然也就成了final型的。
@@ -279,7 +279,7 @@ public static void main(String[] args) {
 
 s1和s2虽然被定义为常量，但是它们都没有马上被赋值。在运算出`s1 + s2`的值之前，他们何时被赋值，以及被赋予什么样的值，都是个变数。因此s1和s2在被赋值之前，性质类似于一个变量。那么`s1 + s2`就不能在编译期被确定，而只能在运行时被创建。
 
-###`String`, `StringBuilder`和`StringBuffer`
+### `String`, `StringBuilder`和`StringBuffer`
 ![@继承结构|center](https://img-blog.csdn.net/20180703182143144?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2lmd2luZHM=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
 - `String`：不可变类，用“+”连接时较慢（详见拘留池）
 - `StringBuilder`：可变类，非线程安全，较快，比`StringBuffer`快10%~15%
