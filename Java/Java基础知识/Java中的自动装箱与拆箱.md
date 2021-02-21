@@ -231,7 +231,15 @@ System.out.println(System.identityHashCode(s9.intern())); // 317983781
 
 > 在Java中，**唯一被重载**的运算符就是用于String的“+”与“+=”。除此之外，Java不允许程序员重载其他的运算符。
 
-如果创建字符串时，“+”两边全部是字面量文本，则会被编译器优化为一个字面量文本，生成的结果会被放入字符串常量池。如果含有字符串引用则会被编译器自动引入`StringBuilder`类，创建一个`StringBuilder`对象，并调用`append()`方法，最后调用`toString()`生成结果，从而避免中间对象的性能损耗，字符串并**不会**放入字符串常量池。后者虽然没有显式的用 new 的方式创建对象，但依然会被编译器编译成 new 的方式。所以遇到多次循环时，循环体中需要尽量避免隐式或者显式创建`StringBuilder`对象。参考[字符串的拼接](https://www.jianshu.com/p/88aa19fc21c6)。
+如果创建字符串时，“+”两边全部是**字面量文本**，则会被**编译器优化**为一个**字面量文本**，生成的结果会被放入字符串常量池。如果含有字符串引用则会被编译器自动引入`StringBuilder`类，创建一个`StringBuilder`对象，并调用`append()`方法，最后调用`toString()`生成结果，从而避免中间对象的性能损耗。在这个过程中，拼接的字符串并**不会**放入字符串常量池。后者虽然没有显式的用 new 的方式创建对象，但依然会被编译器编译成 new 的方式。所以遇到多次循环时，循环体中需要尽量避免隐式或者显式创建`StringBuilder`对象。参考[字符串的拼接](https://www.jianshu.com/p/88aa19fc21c6)。
+
+可以在运行程序时利用，JVM 参数查看字符串常量池的使用情况（StringTable statistics）：
+
+```
+java -XX:+PrintStringTableStatistics Demo
+```
+
+注意：此参数在 JDK 11 中不能正常运行。
 
 形如 s5, s6, s7, s8 的不放入字符串常量池中的情况：
 
