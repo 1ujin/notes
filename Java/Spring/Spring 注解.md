@@ -27,6 +27,8 @@
 
 ---
 ## @Bean
+[Spring容器加载bean的过程](https://blog.csdn.net/qq_37795502/article/details/107086929)
+
 [@Bean 注解全解析](https://www.cnblogs.com/cxuanBlog/p/11179439.html)
 
 [Spring的@Bean只能放在@Configuration里面吗？](https://blog.csdn.net/z69183787/article/details/108105329)

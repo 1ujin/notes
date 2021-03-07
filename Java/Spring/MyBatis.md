@@ -109,6 +109,8 @@ public interface StudentMapper {
 
 [关于SELECT LAST_INSERT_ID()的使用规则](https://www.cnblogs.com/zdb292034/p/8675019.html)
 
+[MyBatis的Insert操作详解](https://blog.csdn.net/shadow_zed/article/details/72897510)
+
 **支持**主键自增的数据库（MySQL）
 
 `useGeneratedKeys="true"` 设置开启主键自增；
@@ -193,7 +195,7 @@ public interface StudentMapper {
 ## JavaType 与 JdbcType
 
 | java.sql.Types 值 | Java 类型            | IBM DB2                       | Oracle           | Sybase                     | SQL              | Informix                      | IBM Content Manager |
-| ---- | ----------------- | -------------------- | ----------------------------- | ---------------- | -------------------------- | ---------------- | ----------------------------- | ------------------- |
+| ----------------- | -------------------- | ----------------------------- | ---------------- | -------------------------- | ---------------- | ----------------------------- | ------------------- |
 | BIGINT            | java.lang.long       | BIGINT                        | NUMBER (38, 0)   | BIGINT                     | BIGINT           | INT8                          | DK_CM_BIGINT        |
 | BINARY            | byte[]               | CHAR FOR BIT DATA             | RAW              | BINARY                     | IMAGE            | BYTE                          | DK_CM_BLOB          |
 | BIT               | java.lang.Boolean    | N/A                           | BIT              | BIT                        | BIT              | BIT                           | DK_CM_SMALLINT      |
@@ -283,13 +285,20 @@ MyBatis中的缓存分为**一级缓存**和**二级缓存**，其执行顺序�
 
 3. 一般不会关闭一级缓存，即使关闭也只能在缓存过后立即清除；
 
-4. 二级缓存默认不开启；
+4. 二级缓存默认开启；
 
 5. 如果二级缓存关闭，直接判断一级缓存是否有数据，如果没有就查数据库；
 
 6. 如果二级缓存开启，先判断二级缓存有没有数据，如果有就直接返回；如果没有，就查询一级缓存，如果有就返回，没有就查询数据库。
 
 综上：**先查二级缓存，再查一级缓存，再查数据库**；即使在一个sqlSession中，也会先查二级缓存；一个namespace中的查询更是如此。
+
+```properties
+# 关闭一级缓存
+mybatis.configuration.local-cache-scope=statement
+# 开启二级缓存
+mybatis.configuration.cache-enabled=true
+```
 
 ## 一级缓存
 
@@ -305,10 +314,31 @@ MyBatis 利用本地缓存机制（Local Cache）防止循环引用和加速重�
 
 ## 二级缓存与第三方缓存库
 
-1. 配置对象
-2. 通过上文中的工厂Bean和配置对象生成管理器Bean
+1. 在配置文件中打开二级缓存（默认打开，可以省略此步）
+
+```properties
+mybatis.configuration.cache-enabled=true
+```
+
+2. 在配置文件中配置第三方缓存库，以Redis为例
+
+```properties
+# Redis 除了timeout都是默认的
+spring.redis.host=localhost
+spring.redis.port=6379
+spring.redis.timeout=1000
+spring.redis.database=0
+spring.redis.jedis.pool.max-active=8
+spring.redis.jedis.pool.max-idle=8
+spring.redis.jedis.pool.max-wait=-1
+spring.redis.jedis.pool.min-idle=0
+```
+
+3. 配置对象类
+4. 模板Bean持有工厂Bean（由于application文件配置而生成，被Spring容器所管理），并设置模板Bean中的序列化器等
 
 ```java
+// 方法一
 @Configuration
 public class RedisConfig {
     public JedisConnectionFactory jedisConnectionFactory;
@@ -336,9 +366,25 @@ public class RedisConfig {
         return template;
     }
 }
+
+// 方法二
+@Configuration
+public class RedisConfig {
+    // RedisTemplate已经存在于Spring容器中了，而且已经持有工厂类了
+    public RedisConfig(RedisTemplate<String, Object> redisTemplate) {
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
+        redisTemplate.setValueSerializer(serializer);
+        redisTemplate.setHashKeySerializer(serializer);
+        redisTemplate.setHashValueSerializer(serializer);
+    }
+}
 ```
 
-3. 缓存类需要用到的工具类，用于从容器中获取Bean
+5. 缓存类需要用到的工具类，用于从容器中获取Bean
 
 ```java
 @Component
@@ -368,7 +414,7 @@ public class SpringContextUtil implements ApplicationContextAware {
 }
 ```
 
-4. 实现缓存类
+6. 实现缓存类
 
 ```java
 public class MybatisRedisCache implements Cache {
@@ -428,10 +474,23 @@ public class MybatisRedisCache implements Cache {
 }
 ```
 
-5. 在MyBatis配置文件中或者在Mapper接口上通过注解开启，可选移除策略：
+7. 在MyBatis配置文件中或者在Mapper接口上通过注解开启，可选移除策略（逐出算法）：
 
 ```xml
-<cache type="com.redis.cache.MybatisRedisCache" eviction="LRU"/>
+<mapper namespace="com.mapper.UserMapper">
+    ...
+    <cache type="com.redis.cache.MybatisRedisCache" eviction="LRU"/>
+    ...
+</mapper>
+```
+
+```java
+// Mapper 接口是没有实现类的
+@Mapper // 该注解效果等同于在配置类上注解 @MapperScan
+@CacheNamespace(eviction = LruCache.class)
+public interface UserMapper {
+    ...
+}
 ```
 
 ## 多数据源 Druid
