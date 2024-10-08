@@ -177,7 +177,7 @@ Redis是**内存数据库**
 ### 连接配置类
 
 遵循NoSQL数据库的配置流程：
-1. 工厂Bean
+1. 工厂Bean（以 Jedis 为例）
 2. 通过工厂Bean生成模板Bean
 
 ```java
@@ -202,12 +202,104 @@ public class RedisConfig {
 }
 ```
 
+3.或者通过配置文件的方式生成工厂Bean和模板Bean
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="standaloneConfig" class="org.springframework.data.redis.connection.RedisStandaloneConfiguration">
+        <property name="hostName" value="localhost"/>
+        <property name="port" value="6379"/>
+    </bean>
+    <!-- 工厂Bean -->
+    <bean id="connectionFactory" class="org.springframework.data.redis.connection.jedis.JedisConnectionFactory" autowire="byName"/>
+    <bean id="defaultSerializer" class="org.springframework.data.redis.serializer.StringRedisSerializer"/>
+    <!-- 模板Bean -->
+    <bean id="template" class="org.springframework.data.redis.core.RedisTemplate" autowire="byName"/>
+</beans>
+```
+
+4.通过配置文件配置，在配置类中自动注入（以 Lettuce 为例）
+
+```yaml
+spring:
+    redis:
+    	host: localhost
+        port: 6379
+        timeout: 1000
+        database: 0
+        lettuce:
+            pool:
+                max-active: 8
+                max-idle: 8
+                min-idle: 0
+                max-wait: -1
+```
+
+```java
+@Configuration
+public class RedisConfig {
+    // 可省略，直接由传参注入
+    @Autowired
+    LettuceConnectionFactory lettuceConnectionFactory;
+    
+    @Bean
+    public RedisTemplate redisTemplate(LettuceConnectionFactory lettuceConnectionFactory) {
+        // 省略配置，步骤与前文相同
+    }
+}
+```
+
+### 连接池 Jedis 与 Lettuce
+
+[在 SpringBoot 2.x 中两个 RedisConnectionFactory 只会加载一个。](https://somersames.xyz/2020/01/05/SpringBoot2-x%E6%98%AF%E6%80%8E%E6%A0%B7%E5%8F%AA%E5%88%9D%E5%A7%8B%E5%8C%96LettuceConnectionFactory%E7%9A%84%E5%91%A2/)
+
+```java
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(RedisOperations.class)
+@EnableConfigurationProperties(RedisProperties.class)
+@Import({ LettuceConnectionConfiguration.class, JedisConnectionConfiguration.class })
+public class RedisAutoConfiguration {
+	@Bean
+	@ConditionalOnMissingBean(name = "redisTemplate")
+	public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory redisConnectionFactory)
+			throws UnknownHostException {
+		RedisTemplate<Object, Object> template = new RedisTemplate<>();
+		template.setConnectionFactory(redisConnectionFactory);
+		return template;
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory)
+			throws UnknownHostException {
+		StringRedisTemplate template = new StringRedisTemplate();
+		template.setConnectionFactory(redisConnectionFactory);
+		return template;
+	}
+}
+```
+
+在 `RedisAutoConfiguration` 中，首先 import 的是 `LettuceConnectionConfiguration`，所以最后才会导致在 SpringBoot2.x 的时候，默认加载的 `redisConnectionFactory` 是 `LettuceConnectionFactory`。
+
+> [Lettuce](https://lettuce.io/) is now used instead of [Jedis](https://github.com/xetorthio/jedis) as the Redis driver when you use `spring-boot-starter-data-redis`. If you are using higher level Spring Data constructs you should find that the change is transparent.
+>
+> We still support Jedis. Switch dependencies if you prefer Jedis by excluding `io.lettuce:lettuce-core` and adding `redis.clients:jedis` instead.
+>
+> Connection pooling is optional and, if you are using it, you now need to add `commons-pool2` yourself as Lettuce, contrary to Jedis, does not bring it transitively.
+
+使用 `spring-boot-starter-data-redis` 时，Redis 驱动程序将使用 Lettuce 而不是 Jedis。如果你正在使用更高级别的 Spring Data 结构，你会发现这一变化是透明的。
+我们仍然支持 Jedis。如果你更喜欢 Jedis，可以通过排除 `io.lettuce:lettuce-core` 并添加 `redis.clients:jedis` 来切换依赖关系。
+连接池是可选的，如果你正在使用它，你现在需要自己添加 `commons-pool2`，因为 Lettuce 与 Jedis 不同，它并不直接使用连接池。
+
 ### 使用连接的 Redis
 
 ```java
 ApplicationContext context;
 // 用配置类的方式
-context = new AnnotationConfigApplicationContext(CachingConfig.class);
+context = new AnnotationConfigApplicationContext(RedisConfig.class);
 // 用xml的方式
 // context = new ClassPathXmlApplicationContext("redis-config.xml");
 RedisTemplate template = context.getBean(RedisTemplate.class);
@@ -325,7 +417,9 @@ public class RedisCacheRepository {
 ### 使用缓存
 
 ```java
-// 上文中配置过的context
+ApplicationContext context;
+// 用配置类的方式
+context = new AnnotationConfigApplicationContext(CachingConfig.class);
 RedisCacheRepository repository = context.getBean(RedisCacheRepository.class);
 repository.getMessage("message");
 repository.setMessage("msg");
@@ -395,7 +489,7 @@ Redis集群没有使用一致性hash,而是引入了**哈希槽**的概念，Red
 
 [基于 Redis 的分布式锁 Redlock](https://zhuanlan.zhihu.com/p/40915772)
 
-特点：
+### 特点
 
 - 安全特性：互斥访问，即永远只有一个 client 能拿到锁
 
@@ -403,15 +497,72 @@ Redis集群没有使用一致性hash,而是引入了**哈希槽**的概念，Red
 
 - 容错性：只要大部分 Redis 节点存活就可以正常提供服务
 
-实现：
+### 实现
+
+加锁和解锁必须是同一个客户端（同一个线程），客户端自己不能把别人加的锁给解了
+
+#### 加锁
+
+在单节点上实现分布式锁
 
 ```shell
 SET resource_name my_random_value NX PX 30000
 ```
 
-主要依靠上述命令，该命令仅当名为`resource_name`的 Key 不存在时（`NX`保证）赋值，并且设置过期时间 30000ms （`PX`保证），值`my_random_value`必须是所有 client 和所有锁请求发生期间唯一的，释放锁的逻辑是：
+主要依靠上述命令，该命令仅当名为`resource_name`的 Key 不存在时（`NX`保证）赋值，并且设置过期时间 30000ms （`PX`保证），值`my_random_value`必须是所有 client 和所有锁请求发生期间唯一的
 
-```shell
+加锁代码：
+
+```java
+/**
+ * @Description 尝试获取分布式锁
+ * @param redisTemplate Redis客户端对象
+ * @param lockKey 锁
+ * @param value 唯一标识
+ * @param expireTime 过期时间
+ * @param util 单位
+ * @return 是否获取成功
+ */
+public static Boolean tryLock(RedisTemplate redisTemplate, String lockKey, String value, long expireTime, TimeUnit util) {
+    long currentTime = System.currentTimeMillis();
+    if (System.currentTimeMillis() - currentTime >= expireTime) {
+        return Boolean.FALSE;
+    }
+    Boolean result = redisTemplate.opsForValue().setIfAbsent(lockKey, value, expireTime, util);
+    if (Boolean.TRUE.equals(result)) {
+        return Boolean.TRUE;
+    }
+    return Boolean.FALSE;
+}
+```
+
+加锁使用了`setIfAbsent`方法，也就是只有在`lockKey`不存在时才加锁，第二个参数为`value`，这个也是很有用的，是否为同一个客户端就是通过这个值来区分，客户端不可以解锁其它人的锁；第三个参数是过期时间；第四个参数是过期时间单位
+
+其实`setIfAbsent`底层实现方法是对Jedis的如下包装，具体参数的详解注解上有：
+```java
+/**
+ * Set the string value as value of the key. The string can't be longer than 1073741824 bytes (1
+ * GB).
+ * @param key
+ * @param value
+ * @param nxxx NX|XX, NX -- Only set the key if it does not already exist. XX -- Only set the key
+ *          if it already exist.
+ * @param expx EX|PX, expire time units: EX = seconds; PX = milliseconds
+ * @param time expire time in the units of <code>expx</code>
+ * @return Status code reply
+ */
+public String set(final String key, final String value, final String nxxx, final String expx, final long time) {
+    checkIsInMultiOrPipeline();
+    client.set(key, value, nxxx, expx, time);
+    return client.getStatusCodeReply();
+ }
+```
+
+#### 解锁
+
+释放锁的逻辑是（Lua脚本）：
+
+```lua
 if redis.call("get",KEYS[1]) == ARGV[1] then
     return redis.call("del",KEYS[1])
 else
@@ -420,4 +571,43 @@ end
 ```
 
 上述实现，通过`redis.call("get",KEYS[1]) == ARGV[1]`先验证该锁`KEYS[1]`的值还是不是client1设置的`ARGV[1]`，可以避免释放另一个client创建的锁，如果只有`del`命令的话，那么如果client1拿到lock1之后因为某些操作阻塞了很长时间，此时Redis端lock1已经过期了并且已经被重新分配给client2，那么client1此时再去释放这把锁就会造成client2原本获取到的锁被client1无故释放了，但现在为每个client分配一个unique的string值可以避免这个问题。至于如何去生成这个unique string，方法很多随意选择一种就行了。
+
+释放锁代码：
+
+```java
+/**
+ * 释放锁成功返回值
+ */
+private static final Long RELEASE_LOCK_SUCCESS = 1L;
+/**
+ * 自动过期释放锁成功返回值
+ */
+private static final Long RELEASE_LOCK_AUTO_SUCCESS = 0L;
+/**
+ * 释放锁lua脚本
+ */
+private static final String LUA_SCRIPT = "" +
+        "if redis.call('get',KEYS[1]) == ARGV[1] then " +
+        "   return redis.call('del',KEYS[1]) " +
+        "else " +
+        "   return 0 " +
+        "end";
+
+/**
+ * @Description 释放锁
+ * @param redisTemplate Redis客户端对象
+ * @param lockKey 锁
+ * @param value 唯一标识
+ * @return 是否解锁成功
+ */
+public static Boolean releaseLock(RedisTemplate redisTemplate, String lockKey, String value) {
+    DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
+    Object result = redisTemplate.execute(redisScript, Collections.singletonList(lockKey), value);
+    // 释放锁成功，或锁自动过期
+    if (RELEASE_LOCK_SUCCESS.equals(result) || RELEASE_LOCK_AUTO_SUCCESS.equals(result)) {
+        return Boolean.TRUE;
+    }
+    return Boolean.FALSE;
+}
+```
 

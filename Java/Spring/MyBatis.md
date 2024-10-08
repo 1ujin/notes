@@ -83,6 +83,7 @@ mybatis.mapper-locations=classpath:mapper/*.xml
 	<if test="state != null">
 	  state = #{state}
 	</if> 
+	<!--如果上一个条件不成立，则 WHERE 会紧跟 AND，通过 trim 去除多余 AND-->
 	<if test="title != null">
 	  AND title LIKE #{title}
 	</if>
@@ -150,6 +151,8 @@ public interface StudentMapper {
 
 此时会将Oracle生成的主键值赋予`id`变量。这个`id`就是USER对象的属性，这样就可以将生成的主键值返回了。如果仅仅是在insert语句中使用但是不返回，此时`keyProperty`可以设置为任意自定义变量名，`resultType`可以不写。Oracle数据库中的值要设置为`BEFORE` ，这是因为Oracle中需要先从序列获取值，然后将值作为主键插入到数据库中。
 
+## ResultType 与 ResultMap
+
 ## 返回的结果与 ResultMap
 
 第1种：通过在查询的SQL语句中定义字段名的别名，让字段名的别名和实体类的属性名一致。
@@ -196,7 +199,7 @@ public interface StudentMapper {
 
 | java.sql.Types 值 | Java 类型            | IBM DB2                       | Oracle           | Sybase                     | SQL              | Informix                      | IBM Content Manager |
 | ----------------- | -------------------- | ----------------------------- | ---------------- | -------------------------- | ---------------- | ----------------------------- | ------------------- |
-| BIGINT            | java.lang.long       | BIGINT                        | NUMBER (38, 0)   | BIGINT                     | BIGINT           | INT8                          | DK_CM_BIGINT        |
+| BIGINT            | java.lang.Long       | BIGINT                        | NUMBER (38, 0)   | BIGINT                     | BIGINT           | INT8                          | DK_CM_BIGINT        |
 | BINARY            | byte[]               | CHAR FOR BIT DATA             | RAW              | BINARY                     | IMAGE            | BYTE                          | DK_CM_BLOB          |
 | BIT               | java.lang.Boolean    | N/A                           | BIT              | BIT                        | BIT              | BIT                           | DK_CM_SMALLINT      |
 | BLOB              | byte[]               | BLOB                          | BLOB             | BLOB                       | BLOB             | BLOB                          | DK_CM_BLOB          |
@@ -277,7 +280,37 @@ JsonNode是Json结构的Java对象，可以通过各个节点访问字段。
 
 ## 缓存
 
-MyBatis中的缓存分为**一级缓存**和**二级缓存**，其执行顺序为：
+**注意：MyBatis二级缓存适用于单表，不变或变化少的数据。如果需要多表，以及数据多变的缓存建议使用Spring Cache。**
+
+<img src="./assets/828941-20230817102122151-1784394039.png" alt="img" style="zoom: 67%;" />
+
+CacheExecutor 源码：
+
+```java
+public <E> List<E> query(MappedStatement ms, Object parameterObject, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
+  Cache cache = ms.getCache();
+  // 检查是否开启二级缓存
+  if (cache != null) {
+    flushCacheIfRequired(ms);
+    if (ms.isUseCache() && resultHandler == null) {
+      ensureNoOutParams(ms, boundSql);
+      @SuppressWarnings("unchecked")
+      List<E> list = (List<E>) tcm.getObject(cache, key);
+      if (list == null) {
+        // 先查二级缓存
+        list = delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+        tcm.putObject(cache, key, list);
+      }
+      return list;
+    }
+  }
+  // 再查一级缓存
+  // delegate 代理为一级缓存处理器 BaseExecutor
+  return delegate.query(ms, parameterObject, rowBounds, resultHandler, key, boundSql);
+}
+```
+
+MyBatis 中的缓存分为**一级缓存**和**二级缓存**，一级缓存依赖于 BaseExecutor，二级缓存依赖于 CacheExecutor，其执行顺序为：
 
 1. 先判断二级缓存是否开启，如果没开启，再判断一级缓存是否开启，如果没开启，直接查数据库；
 
@@ -289,9 +322,11 @@ MyBatis中的缓存分为**一级缓存**和**二级缓存**，其执行顺序�
 
 5. 如果二级缓存关闭，直接判断一级缓存是否有数据，如果没有就查数据库；
 
-6. 如果二级缓存开启，先判断二级缓存有没有数据，如果有就直接返回；如果没有，就查询一级缓存，如果有就返回，没有就查询数据库。
+6. 如果二级缓存开启，先判断一级缓存有没有数据，如果有就直接返回；如果没有，就查询二级缓存，如果有就返回，没有就查询数据库。
 
-综上：**先查二级缓存，再查一级缓存，再查数据库**；即使在一个sqlSession中，也会先查二级缓存；一个namespace中的查询更是如此。
+综上：**先查二级缓存，再查一级缓存，再查数据库**；即使在一个sqlSession中，也会先查二级缓存；一个namespace中的查询更是如此：
+
+<img src="./assets/828941-20230817112104236-1247842473.png" alt="img" style="zoom: 33%;" />
 
 ```properties
 # 关闭一级缓存
@@ -314,13 +349,41 @@ MyBatis 利用本地缓存机制（Local Cache）防止循环引用和加速重�
 
 ## 二级缓存与第三方缓存库
 
-1. 在配置文件中打开二级缓存（默认打开，可以省略此步）
+本质就是实现缓存接口作为二级缓存，并持有缓存库。
+
+[Spring Boot + Mybatis + Redis as L2cache](https://my.oschina.net/ljc94/blog/1504320)
+
+1. pom依赖
+
+```xml
+<dependency>
+    <groupId>redis.clients</groupId>
+    <artifactId>jedis</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>org.springframework.data</groupId>
+    <artifactId>spring-data-redis</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+</dependency>
+
+<dependency>
+    <groupId>org.mybatis.caches</groupId>
+    <artifactId>mybatis-redis</artifactId>
+</dependency>
+```
+
+2. 在配置文件中打开二级缓存（默认打开，可以省略此步）
 
 ```properties
 mybatis.configuration.cache-enabled=true
 ```
 
-2. 在配置文件中配置第三方缓存库，以Redis为例
+3. 在配置文件中配置第三方缓存库，以Redis为例
 
 ```properties
 # Redis 除了timeout都是默认的
@@ -334,8 +397,8 @@ spring.redis.jedis.pool.max-wait=-1
 spring.redis.jedis.pool.min-idle=0
 ```
 
-3. 配置对象类
-4. 模板Bean持有工厂Bean（由于application文件配置而生成，被Spring容器所管理），并设置模板Bean中的序列化器等
+4. 配置对象类
+5. 模板Bean持有工厂Bean（由于application文件配置而生成，被Spring容器所管理），并设置模板Bean中的序列化器等
 
 ```java
 // 方法一
@@ -351,15 +414,18 @@ public class RedisConfig {
     @Bean
     @Primary
     public RedisTemplate<String, Object> redisTemplate() {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(jedisConnectionFactory);
-        template.setKeySerializer(new StringRedisSerializer());
+        // 配置序列化器
         // 可以从字符串、流或文件解析JSON https://blog.csdn.net/blwinner/article/details/99942211
         ObjectMapper mapper = new ObjectMapper();
         // jackson的自动检测机制 https://www.cnblogs.com/twoheads/p/9482448.html
         mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
+        
+        // 配置模板
+        RedisTemplate<String, Object> template = new RedisTemplate<>();
+        template.setConnectionFactory(jedisConnectionFactory);
+        template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(serializer);
         template.setHashKeySerializer(serializer);
         template.setHashValueSerializer(serializer);
@@ -372,11 +438,14 @@ public class RedisConfig {
 public class RedisConfig {
     // RedisTemplate已经存在于Spring容器中了，而且已经持有工厂类了
     public RedisConfig(RedisTemplate<String, Object> redisTemplate) {
-        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        // 配置序列化器
         ObjectMapper mapper = new ObjectMapper();
         mapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
         mapper.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
+        
+        // 配置模板
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
         redisTemplate.setValueSerializer(serializer);
         redisTemplate.setHashKeySerializer(serializer);
         redisTemplate.setHashValueSerializer(serializer);
@@ -384,7 +453,7 @@ public class RedisConfig {
 }
 ```
 
-5. 缓存类需要用到的工具类，用于从容器中获取Bean
+6. 缓存类需要用到的工具类，用于从容器中获取Bean
 
 ```java
 @Component
@@ -414,23 +483,40 @@ public class SpringContextUtil implements ApplicationContextAware {
 }
 ```
 
-6. 实现缓存类
+7. 实现缓存接口，覆盖方法
+   - 获取Spring容器上下文中的模板Bean
+   - `getId`
+   - `putObject`
+   - `getObject`
+   - `removeObject`
+   - `clear`
+   - `getSize`
 
 ```java
 public class MybatisRedisCache implements Cache {
-    public String id;
+    private final String id;
     public RedisTemplate redisTemplate;
 
     public MybatisRedisCache(String id) {
+        if (id == null)
+            throw new IllegalArgumentException("Cache instances require an ID");
         this.id = id;
-        redisTemplate = (RedisTemplate) SpringContextUtil.getApplicationContext().getBean("redisTemplate");
+        getRedisTemplate();
+    }
+    
+    private RedisTemplate getRedisTemplate() {
+        if (redisTemplate == null)
+            redisTemplate = (RedisTemplate) SpringContextUtil.getApplicationContext().getBean("redisTemplate");
+        return redisTemplate;
     }
 
+    // MyBatis缓存操作对象的标识符，一个Mapper对应一个MyBatis的缓存操作对象
     @Override
     public String getId() {
         return id;
     }
 
+    // 添加或修改缓存
     @Override
     public void putObject(Object key, Object value) {
         System.out.println("PUT: " + key.toString() + value.toString());
@@ -441,6 +527,7 @@ public class MybatisRedisCache implements Cache {
         redisTemplate.opsForHash().put(getId(), key, value);
     }
 
+    // 获取缓存
     @Override
     public Object getObject(Object key) {
         /*
@@ -452,6 +539,11 @@ public class MybatisRedisCache implements Cache {
         return value;
     }
 
+    /**
+     * 从缓存中删除对应的key、value，只有在回滚时触发。
+     * 一般我们也可以不用实现，具体使用方式请参考：
+     * org.apache.ibatis.cache.decorators.TransactionalCache
+     */
     @Override
     public Object removeObject(Object key) {
         redisTemplate.opsForHash().delete(getId(), key);
@@ -459,27 +551,41 @@ public class MybatisRedisCache implements Cache {
         return null;
     }
 
+    // 发生更新时，清除缓存
     @Override
     public void clear() {
         System.out.println("CLEAR");
-        redisTemplate.delete(getId());
+        redisTemplate.execute((RedisCallback) connection -> {
+            connection.flushDb();
+            return null;
+        });
     }
 
+    // 可选实现，返回缓存的数量
     @Override
     public int getSize() {
-        Long size = redisTemplate.opsForHash().size(getId());
+        // Long size = redisTemplate.opsForHash().size(getId());
+        Long size = (Long) redisTemplate.execute((RedisCallback) connection -> connection.dbSize());
         System.out.println("SIZE: " + size);
         return size == null ? 0 : size.intValue();
+    }
+    
+    // 可选实现，用于实现原子性的缓存操作
+    private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    
+    @Override
+    public ReadWriteLock getReadWriteLock() {
+        return readWriteLock;
     }
 }
 ```
 
-7. 在MyBatis配置文件中或者在Mapper接口上通过注解开启，可选移除策略（逐出算法）：
+8. 在MyBatis配置文件中或者在Mapper接口上通过注解开启，可选移除策略（逐出算法）：
 
 ```xml
-<mapper namespace="com.mapper.UserMapper">
+<mapper namespace="mydemo.mapper.UserMapper">
     ...
-    <cache type="com.redis.cache.MybatisRedisCache" eviction="LRU"/>
+    <cache type="mydemo.redis.cache.MybatisRedisCache" eviction="LRU"/>
     ...
 </mapper>
 ```
@@ -492,6 +598,10 @@ public interface UserMapper {
     ...
 }
 ```
+
+二级缓存的缺点：
+
+不同命名空间的缓存数据不一致。
 
 ## 多数据源 Druid
 

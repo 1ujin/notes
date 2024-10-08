@@ -64,7 +64,7 @@ create TABLESPACE <tablespace_name>
 grant create session to zhangsan; -- 授予zhangsan用户创建session的权限，即登陆权限
 grant unlimited session to zhangsan; -- 授予zhangsan用户使用表空间的权限
 grant create table to zhangsan; -- 授予创建表的权限
-grante drop table to zhangsan; -- 授予删除表的权限
+grant drop table to zhangsan; -- 授予删除表的权限
 grant insert table to zhangsan; -- 插入表的权限
 grant update table to zhangsan; -- 修改表的权限
 grant all to public; -- 这条比较重要，授予所有权限(all)给所有用户(public)
@@ -88,9 +88,29 @@ grant alert all table to zhangsan; -- 授予zhangsan用户alert任意表的权�
 
 `lsnrctl`可以控制监听器。
 
+### RMAN(Recovery Manager)
+
+RMAN（Recovery Manager）是一种用于[备份](https://baike.baidu.com/item/备份/4249315)(backup)、还原(restore)和恢复(recover)数据库的 Oracle 工具。RMAN只能用于ORACLE8或更高的版本中。它能够备份整个数据库或数据库部件，如表空间、数据文件、控制文件、归档文件以及Spfile参数文件。RMAN也允许您进行增量数据块级别的备份，增量RMAN备份是时间和空间有效的，因为他们只备份自上次备份以来有变化的那些数据块。而且，通过RMAN提供的接口，第三方的备份与恢复软件如veritas将提供更强大的备份与恢复的管理功能。通过RMAN，也提供了其它更多功能，如数据库的克隆、采用RMAN建立备用数据库、利用RMAN备份与移动裸设备（RAW）上的文件等工作将变得更方便简单。9i的RMAN通过增强的自动配置与管理功能，以及特有的块级别的恢复，将使备份与恢复工作变得更加快捷与完美。
+
+`rman` 启动RMAN
+
+`RMAN> exit;`退出
+
+`RMAN> connect target username/password;`
+
+`RMAN> crosscheck archivelog all;`
+
+`RMAN> delete expired archivelog all;`
+
+`RMAN> delete obsolete;`
+
+`RMAN> crosscheck backupset;`
+
+`RMAN> delete expired backupset;`
+
 ## CDB 与 PDB
 
-![CDB与PDB的关系图](https://img2018.cnblogs.com/blog/1459131/201812/1459131-20181226105008433-131589082.png)
+![CDB与PDB的关系图](./assets/1459131-20181226105008433-131589082.png)
 
 [oracle_新增pdb实例](https://blog.csdn.net/zs_life/article/details/101266871)
 

@@ -24,6 +24,8 @@
 
 [Java中几种常量池的区分](http://tangxman.github.io/2015/07/27/the-difference-of-java-string-pool/)
 
+[JVM系列之:String.intern和stringTable](https://www.cnblogs.com/flydean/p/13379747.html)
+
 ---
 ## 基本数据类型
 
@@ -37,7 +39,7 @@
 
 对于基本类型（原始类型）：`boolean`, `char`, `byte`, `short`, `int`, `long`, `float`, `double`来说，不是对象类型所以不会生成对象，所有生成的过程均为（以`int`为例）：
 
-```plain
+```
 iconst_1        // [-1, 5] 
 istore_1 
 bipush        6 // 小于-1或大于5时 
@@ -185,11 +187,12 @@ System.out.println(s + " @ " + System.identityHashCode(s));     // bbc @ 3809362
 
 可以看出此处`s.getBytes()`返回的对象是`Arrays.copyOf()`方法**浅复制**的，地址不同，所以不是`value`。
 
-JDK 源码中的字符串构造方法：
+JDK 源码中的字符串构造方法，可以看到通过构造器生成的字符串对象是传入的字符串`original`的**深复制**：
 >Initializes a newly created `String` object so that it represents  the same sequence of characters as the argument; in other words, the newly created string is a copy of the argument string. Unless an  explicit copy of `original` is needed, use of this constructor is unnecessary since Strings are immutable.
 
 ```java
-@HotSpotIntrinsicCandidate // 被注解的方法在 HotSpot 中都有一套高效的实现，该高效实现基于 CPU 指令，运行时，HotSpot 维护的高效实现会替代 JDK 的源码实现，从而获得更高的效率
+// 被注解的方法在 HotSpot 中都有一套高效的实现，该高效实现基于 CPU 指令，运行时，HotSpot 维护的高效实现会替代 JDK 的源码实现，从而获得更高的效率
+@HotSpotIntrinsicCandidate
 public String(String original) {
     this.value = original.value;
     this.coder = original.coder;
@@ -197,15 +200,21 @@ public String(String original) {
 }
 ```
 
-通过形如 s1, s2, s3, s4 采用引号包含文本方式创建的`String`对象，在**第一次**创建时会被加入到**字符串常量池**中，之后若再次创建，就在字符串常量池中拿对象，其地址都相同。而采用`new String()`的方式会产生新的对象，地址各不相同。如果构造器传入的参数文本为第一次创建，则会在**类加载**时先执行前一种创建方法，将字符串加入到字符串常量池中。然后从字符串常量池中取出字符串对象的地址赋给引用，从而生成新的对象。[字符串常量池在 JDK 7 之前存在运行时常量池（Prem）中，在 JDK 7 已经将其转移到堆（Java Heap）中。](https://www.javatt.com/p/47643)
+<img src="./assets/cf8dd1da04c744fb9892931485285d4e.png" alt="在这里插入图片描述" style="zoom:67%;" />
 
-> 在 HotSpot VM 中字符串常量池是通过一个`StringTable`类实现的，它是一个 Hash 表，默认值大小长度是1009；这个`StringTable`在每个 HotSpot VM 的实例中**只有一份**，被所有的类共享；字符串常量由一个一个字符组成，放在了`StringTable`上。要注意的是，如果放进字符串常量池的字符串非常多，就会造成 Hash 冲突严重，从而导致链表很长，而链表长了后直接会造成的影响就是当调用`intern()`时性能会大幅下降（因为要一个一个找）。
+<img src="./assets/23b10977d9cb439eac3fb19377f61dea.png" alt="在这里插入图片描述" style="zoom:67%;" />
+
+通过形如 s1, s2, s3, s4 采用引号包含文本方式创建的`String`对象，在**第一次**创建时会被加入到[**字符串常量池**](https://segmentfault.com/a/1190000040922573)中，之后若再次创建，就在字符串常量池中拿对象，其地址都相同。而采用`new String()`的方式会产生新的对象，地址各不相同。如果构造器传入的参数文本为第一次创建，则会在**类加载**时先执行前一种创建方法，将字符串加入到字符串常量池中。然后从字符串常量池中取出字符串对象的地址赋给引用，从而生成新的对象。[字符串常量池在 JDK 7 之前存在运行时常量池（Prem）中，在 JDK 7 已经将其转移到堆（Java Heap）中。](https://www.javatt.com/p/47643)
+
+> 在 HotSpot VM 中字符串常量池是通过一个`StringTable`类实现的，它是一个由 Hostspot 的 C++ 实现的 HashTable，默认值大小长度是1009；这个`StringTable`在每个 HotSpot VM 的实例中**只有一份**，被所有的类共享；字符串常量由一个一个字符组成，放在了`StringTable`上。要注意的是，如果放进字符串常量池的字符串非常多，就会造成 Hash 冲突严重，从而导致链表很长，而链表长了后直接会造成的影响就是当调用`intern()`时性能会大幅下降（因为要一个一个找）。
 
 > 在 JDK 6 及之前版本，字符串常量池中**所引用的**字符串实例是放在 Perm Gen 区（方法区）中的，`StringTable`的长度是固定的1009；在 JDK 7 版本中，这些实例被移到了堆中。而`StringTable`自身则一直在 Native Memory 中。 `StringTable`的长度可以通过`--XX:StringTableSize=<size>`参数指定。至于 JDK 7 为什么把常量池中的引用移动到堆中，原因可能是由于方法区的内存空间太小且不方便扩展，而堆的内存空间比较大且扩展方便。
 
->字符串常量池，全局字符串池（String Pool, String Literal Pool）：全局字符串池里的内容是在类加载完成，经过验证，**准备阶段之后在堆中生成字符串对象实例，然后将该字符串对象实例的引用值存到 String Pool 中（记住：String Pool 中存的是引用值而不是具体的实例对象，具体的实例对象是在堆中开辟的一块空间存放的）。** 在 HotSpot VM 里实现的 String Pool 功能的是一个`StringTable`类，它是一个哈希表，里面存的是驻留字符串(也就是我们常说的用双引号括起来的)的引用（而不是驻留字符串实例本身），也就是说在堆中的某些字符串实例被这个`StringTable`引用之后就等同被赋予了”驻留字符串”的身份。这个`StringTable`在每个 HotSpot VM 的实例只有一份，被所有的类共享。 
+>字符串常量池，全局字符串池（String Pool, String Literal Pool）：全局字符串池里的内容是在类加载完成，经过验证，**准备阶段之后在堆中生成字符串对象实例，然后将该字符串对象实例的引用值存到 String Pool 中（记住：String Pool 中存的是引用值而不是具体的实例对象，具体的实例对象是在堆中开辟的一块空间存放的）。** 在 HotSpot VM 里实现的 String Pool 功能的是一个`StringTable`类，它是一个哈希表，里面存的是驻留字符串(也就是我们常说的用双引号括起来的)的引用（而不是驻留字符串实例本身），也就是说在堆中的某些字符串实例被这个`StringTable`引用之后就等同被赋予了”驻留字符串”的身份。这个`StringTable`在每个 HotSpot VM 的实例只有一份，被所有的类共享。 [注意区分字符串常量池和运行时常量池](https://stackoverflow.com/questions/70346805/does-string-intern-has-anything-to-to-with-jvm-run-time-constant-pool)。
+>
+><img src="./assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_0,text_aHR0cDovL3d3dy5mbHlkZWFuLmNvbQ==,size_35,color_8F8F8F,t_70.png" alt="img" style="zoom: 33%;" />
 
-字符串的拘留：`String`对象的`intern()`方法会查找在字符串常量池中是否存在一份内容相等的字符串，如果有则返回该字符串的引用，如果没有则添加自己的字符串进入字符串常量池。直接使用双引号声明出来的`String`对象会直接存储在字符串常量池中，如果不是用双引号声明的`String`对象，可以使用`intern()`方法。使用`intern()`方法会增加少量时间，但会节省空间，从而也节省了占用空间引起的垃圾回收的时间。
+字符串的拘留：`String`对象的`intern()`方法会查找在字符串常量池中是否存在一份内容相等的字符串，如果有则返回该字符串的引用，JDK7之前如果没有则添加自己的字符串进入字符串常量池，从JDK7开始不会加入字符串常量池。直接使用双引号声明出来的`String`对象会直接存储在字符串常量池中，如果不是用双引号声明的`String`对象，可以使用`intern()`方法。使用`intern()`方法会增加少量时间，但会节省空间，从而也节省了占用空间引起的垃圾回收的时间。
 
 ```java
 String s1 = "ab", s2 = "cd";                              // 创建"ab"和"cd"对象分别放入字符串常量池
@@ -235,7 +244,7 @@ System.out.println(System.identityHashCode(s9.intern())); // 317983781
 
 可以在运行程序时利用，JVM 参数查看字符串常量池的使用情况（StringTable statistics）：
 
-```
+```shell
 java -XX:+PrintStringTableStatistics Demo
 ```
 
@@ -288,7 +297,7 @@ public static void main(String[] args) {
 s1和s2虽然被定义为常量，但是它们都没有马上被赋值。在运算出`s1 + s2`的值之前，他们何时被赋值，以及被赋予什么样的值，都是个变数。因此s1和s2在被赋值之前，性质类似于一个变量。那么`s1 + s2`就不能在编译期被确定，而只能在运行时被创建。
 
 ### `String`, `StringBuilder`和`StringBuffer`
-![@继承结构|center](https://img-blog.csdn.net/20180703182143144?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2lmd2luZHM=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
+![@继承结构|center](./assets/70.png)
 - `String`：不可变类，用“+”连接时较慢（详见拘留池）
-- `StringBuilder`：可变类，非线程安全，较快，比`StringBuffer`快10%~15%
+- `StringBuilder`：可变类，非线程安全，较快，比`StringBuffer`快10%~15%。其`toString()`方法不会将字符串存入常量池，只会在堆中创建新对象
 - `StringBuffer`：可变类，线程安全（同步锁）
