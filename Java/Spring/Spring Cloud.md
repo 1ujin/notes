@@ -1910,6 +1910,8 @@ MQ 是消息通信的模型，并发具体实现。现在实现 MQ 的有两种�
 
 ![](./assets/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBAX1_lpYvmlpfnmoTljaHljaE=,size_12,color_FFFFFF,t_70,g_se,x_16.png)
 
+幂等性问题
+
 ## RabbitMQ
 
 ![img](./assets/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2thdml0bw==,size_16,color_FFFFFF,t_70.png)
@@ -2140,5 +2142,11 @@ mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=19876,--rocketmq.
 ```powershell
 Start-Process -WindowStyle Hidden -File mvn -ArgumentList "spring-boot:run", "-Dspring-boot.run.arguments=--server.port=19876,--rocketmq.config.namesrvAddr=localhost:9876"
 ```
+
+事务消息：
+
+![image.png](./assets/WEBRESOURCE331be2d51b489b63652525dde2d43e04.png)
+
+![image.png](./assets/WEBRESOURCEc3473961a0c3069990bc54cee2a6f275.png)
 
 ## Kafka
