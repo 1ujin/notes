@@ -134,7 +134,7 @@ alter table table_name drop key idx_name;
 
 ### 覆盖索引
 
-在一次查询中，如果一个索引包含或者说覆盖所有需要查询的字段的值，我们就称之为覆盖索引，而不再需要**回表查询**。而要确定一个查询是否是覆盖索引，我们只需要`EXPLAIN`语句看`Extra`列的结果是否是`Using index`即可。
+在一次查询中，如果一个索引包含或者说覆盖**所有**需要查询的字段的值，我们就称之为覆盖索引，而不再需要**回表查询**。而要确定一个查询是否是覆盖索引，我们只需要`EXPLAIN`语句看`Extra`列的结果是否是`Using index`即可。
 
 ### 全文索引（Fulltext Index）
 
@@ -326,6 +326,8 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 <img src="./assets/1633379-20230924102826381-2084756780.png" alt="img" style="zoom:50%;" />
 
 ### 读已提交（Read Committed）
+
+读写混合操作较多时推荐该级别。
 
 **只能读到其他事务已经提交的数据。** 这个隔离级别解决了脏读的问题，不会读到未提交的值，但是却会产生「不可重复读」问题。
 
@@ -572,12 +574,12 @@ install plugin rpl_semi_sync_slave soname 'semisync_slave.so';
 
 1. 禁止使用`SELECT *`：不走覆盖索引，会产生回表；
 
-2. 小表驱动大表：`SELECT ... FROM '小表' JOIN '大表'`，因为需要先查出前者中的全部数据，所以前者应为小表、索引完备的表。其底层为 Join Buffer 缓冲区，其默认大小`innodb_buffer_pool_size`为 0x800000 = 8388608：
+2. 小表驱动大表：`SELECT ... FROM '小表' JOIN '大表'`，因为需要先查出前者中的全部数据，所以前者应为小表、索引完备的表。可以通过`FORCE INDEX`和`STRAIGHT_JOIN`强制指定。其底层为 Join Buffer 缓冲区，其默认大小`innodb_buffer_pool_size`为 0x800000 = 8388608：
 
    > `innodb_buffer_pool_size`
    >
    > - 定义：这个参数定义了 InnoDB 用于缓存数据和索引的总内存大小。它是 InnoDB 的主要内存结构，决定了可以缓存的数据量，从而影响数据库的性能。
-   > - 单位：以字节为单位，通常设置为系统内存的 70%-80%（对于数据库服务器）。
+   > - 单位：以字节为单位，通常设置为系统内存的 70% ~ 80%（对于数据库服务器）。
    >
    > `innodb_buffer_pool_chunk_size`
    >
@@ -586,15 +588,17 @@ install plugin rpl_semi_sync_slave soname 'semisync_slave.so';
 
 3. 连接查询代替子查询；
 
-4. 提升`GROUP BY`的效率：被分组的列建立索引；
+4. 提升`GROUP BY`的效率：被分组的列建立索引； 
 
 5. 批量插入：单条插入每条都要连接数据库的 connection，SQL——`VALUES`，Mybatis——`<foreache>`，`ExecutorType.BATCH`。默认最大单次插入条数`max_allowed_packet`为 0x400000 = 4194304；
 
-6. 使用`LIMIT`；
+6. 使用`LIMIT`：查询时，最后几页不需要，避免深度分页；
 
 7. `UNION ALL`代替`UNION`：后者会去重，非要用则考虑提升查询本身的效率；
 
-8. 尽量少关联表；
+8. 尽量少关联表：
+
+   > 不加索引的字段表连接不允许超过 3 张
 
 # Spring 中的数据源动态切换
 
