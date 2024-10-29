@@ -1344,3 +1344,145 @@ public class UserConfigure {
     }
 }
 ```
+
+## @Payload
+
+在 Spring 框架中，`@Payload` 注解主要用于在消息驱动开发中，从消息中提取消息体（payload）并将其绑定到方法参数上，通常用于与消息中间件（如 Kafka、RabbitMQ、JMS 等）进行集成的场景。
+
+`@Payload` 通常与消息监听器方法一起使用，特别是在使用 Spring Messaging 或 Spring Integration 时。它告诉 Spring 如何将消息体转换为方法参数的类型。
+
+### 代码示例
+
+以下是一个使用 RabbitMQ 的简单示例，展示了如何在消息监听器中使用 `@Payload` 来接收消息体。
+
+#### 1. 依赖
+
+在 `pom.xml` 中，确保你有相关的依赖：
+
+```xml
+<dependencies>
+    <!-- Spring Boot RabbitMQ Starter -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+    <!-- JSON 序列化支持 -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+    </dependency>
+</dependencies>
+```
+
+#### 2. 配置类
+
+配置 RabbitMQ 队列、交换器和绑定：
+
+```java
+import org.springframework.amqp.core.*;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RabbitMQConfig {
+
+    public static final String QUEUE_NAME = "myQueue";
+    public static final String EXCHANGE_NAME = "myExchange";
+
+    @Bean
+    public Queue queue() {
+        return new Queue(QUEUE_NAME, true);
+    }
+
+    @Bean
+    public TopicExchange exchange() {
+        return new TopicExchange(EXCHANGE_NAME);
+    }
+
+    @Bean
+    public Binding binding(Queue queue, TopicExchange exchange) {
+        return BindingBuilder.bind(queue).to(exchange).with("routing.key.#");
+    }
+}
+```
+
+#### 3. 消息消费者
+
+在消费者类中，我们使用 `@RabbitListener` 监听来自队列的消息，并通过 `@Payload` 注解提取消息体。
+
+```java
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MessageConsumer {
+
+    @RabbitListener(queues = RabbitMQConfig.QUEUE_NAME)
+    public void receiveMessage(@Payload MyMessage message) {
+        System.out.println("Received message: " + message);
+    }
+}
+```
+
+#### 4. 消息体类
+
+创建一个 POJO 类 `MyMessage`，用于映射消息的 JSON 数据。
+
+```java
+public class MyMessage {
+    private String content;
+    private String sender;
+
+    // getters and setters
+
+    @Override
+    public String toString() {
+        return "MyMessage{" +
+                "content='" + content + '\'' +
+                ", sender='" + sender + '\'' +
+                '}';
+    }
+}
+```
+
+#### 5. 发送消息
+
+为了测试消费者，我们可以创建一个控制器，向 RabbitMQ 发送消息。
+
+```java
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class MessageProducer {
+
+    private final RabbitTemplate rabbitTemplate;
+
+    public MessageProducer(RabbitTemplate rabbitTemplate) {
+        this.rabbitTemplate = rabbitTemplate;
+    }
+
+    @GetMapping("/send")
+    public String sendMessage(@RequestParam String content, @RequestParam String sender) {
+        MyMessage message = new MyMessage();
+        message.setContent(content);
+        message.setSender(sender);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, "routing.key.test", message);
+        return "Message sent!";
+    }
+}
+```
+
+#### 6. 运行流程
+
+1. 当访问 `/send` 端点时，例如：`http://localhost:8080/send?content=Hello&sender=Alice`，会将消息发送到 RabbitMQ 队列。
+2. 消费者 `MessageConsumer` 监听队列，并通过 `@Payload` 提取消息体 `MyMessage`。
+3. `receiveMessage` 方法将处理收到的消息并输出到控制台。
+
+### 小结
+
+- `@Payload` 的作用是从消息中提取消息体并映射到方法参数上。
+- 在消息驱动的应用中，它可以让你轻松将消息载荷绑定到 POJO 对象上，简化消息处理的开发。

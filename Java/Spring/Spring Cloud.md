@@ -2132,9 +2132,13 @@ public class RabbitConfiguration {
 开启仪表板：
 
 ```powershell
-mvn spring-boot:run "-Dspring-boot.run.arguments=`"--server.port=19876,--rocketmq.config.namesrvAddr=localhost:9876`""
+mvn spring-boot:run "-Dspring-boot.run.arguments=--server.port=19876,--rocketmq.config.namesrvAddr=localhost:9876"
 ```
 
+隐藏输出：
 
+```powershell
+Start-Process -WindowStyle Hidden -File mvn -ArgumentList "spring-boot:run", "-Dspring-boot.run.arguments=--server.port=19876,--rocketmq.config.namesrvAddr=localhost:9876"
+```
 
 ## Kafka

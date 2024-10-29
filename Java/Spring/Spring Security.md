@@ -533,7 +533,133 @@ https://blog.csdn.net/qq_43437874/article/details/121631195
 
 ![在这里插入图片描述](./assets/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5LqR54Of5oiQ6ZuoY3Nkbg==,size_17,color_FFFFFF,t_70,g_se,x_16.png)
 
-## 生成和配置证书
+![img](./assets/https_rsa.png)
+
+CA：Certificate Authority
+
+CSR：Certificate Signing Request
+
+CRT：Certificate 公钥
+
+CER：Certificate 公钥 + 私钥
+
+PEM：Privacy Enhanced Mail
+
+预主密钥：pre-master secret， 在 TLS 握手过程中,客户端生成一个随机的预主密钥
+
+客户端随机数 + 服务端随机数 + 预主密钥 = 会话密钥
+
+## 密钥和证书
+
+![在这里插入图片描述](./assets/6423d93363b8479d973d64c99c04eb30.png)
+
+在 SSL/TLS 证书体系中，根证书（Root Certificate）、中间证书（Intermediate Certificate）、证书链（Certificate Chain）都是至关重要的概念，它们构成了整个证书验证的体系结构，确保了 SSL 连接的安全性。下面是对这些概念的详细解释：
+
+### 根证书（Root Certificate）
+
+- 根证书是由受信任的证书颁发机构（CA, Certificate Authority）签发的自签名证书。它是整个证书链的起点，具有最高级别的信任。
+
+- 根证书由全球受信任的CA（如 DigiCert、GlobalSign、Let’s Encrypt）发布，并已经内置于常见的操作系统和浏览器中。这意
+
+  着，当用户访问使用 SSL 的网站时，浏览器会自动信任这些根证书。
+
+- 根证书自签名，这意味着它是由CA自己签署的，而不是由其他任何CA颁发。
+
+特点：
+
+- 权威性：根证书位于证书链的最顶端，具有最高的信任级别。
+- 自签名：根证书不是由上级签发，而是自签名的。
+- 存储于操作系统和浏览器中：根证书是操作系统、浏览器的信任列表的一部分。
+
+### 中间证书（Intermediate Certificate）
+
+- 中间证书是由根证书或其他中间证书颁发的，用来为最终的服务器证书提供一个中间的信任层。中间证书的主要目的是在根证书和服务器证书之间建立一个链式结构，使得根证书不直接参与每个网站的签发。
+- CA使用中间证书对服务器证书进行签名，而不是使用根证书直接签名。这是为了安全性考虑，防止根证书泄露或受到攻击，因为一旦根证书失效，整个 CA 的信任链都会崩溃。
+
+特点：
+
+- 由根证书或其他中间证书签发。
+- 用于签发服务器证书。
+- 具有更短的有效期，以便于安全性管理。
+
+### 服务器证书（Server Certificate）
+
+- 服务器证书是网站的SSL证书，通常由中间证书签发。它是网站服务器提供给客户端（如浏览器）的证书，客户端使用它来建立SSL连接。
+- 服务器证书是实际被使用来保护网站通信的证书，包含了网站的域名、证书的有效期、CA的签名等信息。
+
+### 证书链（Certificate Chain）
+
+- 证书链是由多个证书按层级结构组成的一条信任链，从服务器证书到根证书。它包含服务器证书、中间证书，以及根证书的顺序关系。客户端通过验证整个证书链，逐层确认每一个证书的真实性，最终信任根证书。
+- 证书链中的每个证书都由上一级的证书进行签名，最终根证书是链条的顶端。
+
+证书链验证流程：
+
+1. 浏览器或客户端获取服务器的证书。
+2. 浏览器检查该服务器证书的签发者（CA），并通过中间证书找到这个CA的证书。
+3. 如果中间证书也是由更上一级的中间证书签发，继续往上查找，直到找到根证书。
+4. 浏览器信任已知的根证书，因此证书链验证通过，浏览器认为该网站安全。
+
+### 举例说明
+
+假设你访问一个网站时，浏览器接收到以下证书链：
+
+- 服务器证书：由 Intermediate CA 签发，用于特定网站（如 www.example.com）。
+- 中间证书：由 Root CA 签发，用于 Intermediate CA 颁发服务器证书。
+- 根证书：由 Root CA 自己签发，是操作系统或浏览器中已经内置的信任证书。
+
+证书链的顺序：服务器证书 ← 中间证书 ← 根证书
+
+### 总结
+
+- 根证书是整个信任链的顶点，由 CA 自签名并存储在操作系统和浏览器中。
+- 中间证书由根证书或其他中间证书签发，用于签发服务器证书，增强安全性。
+- 服务器证书是最终用来保护网站的SSL证书。
+- 证书链是由服务器证书、中间证书和根证书组成的层级信任链，保证浏览器信任网站的安全性。
+
+
+仅导入自签名的中间证书无法使浏览器信任这个证书链，也无法消除“不安全”的提示。原因是：
+
+1. 根证书的信任是基础
+浏览器信任链的基础在于根证书。只有浏览器信任的根证书才能验证并信任后续的中间证书和服务器证书。如果只导入了中间证书，浏览器无法验证它的签发者，因此无法信任它。
+
+2. 中间证书需要上级签发
+中间证书的可信赖性依赖于它的上级证书（通常是根证书）。如果浏览器没有信任根证书，那么中间证书也不会被信任。即使你导入了中间证书，浏览器仍然会尝试向上查找根证书。如果根证书不在浏览器的信任列表中，浏览器就会认为证书链是不完整的，从而发出“不安全”的警告。
+
+3. 自签名证书链的验证过程
+自签名证书是由自己签发的根证书，通常不被浏览器默认信任。对于自签名证书链，整个信任链是由自签名的根证书开始的。因此，如果你使用自签名的证书，而不导入根证书，浏览器无法通过根证书来验证中间证书，也无法信任服务器的证书。
+
+如何解决：
+导入自签名的根证书：要让浏览器信任自签名的证书链，必须将自签名的根证书导入到浏览器或操作系统的信任证书列表中。只有这样，浏览器才能信任证书链中的中间证书和服务器证书，从而避免“不安全”的警告。
+
+使用受信任的CA颁发证书：另一种选择是使用全球受信任的证书颁发机构（CA）签发的证书，这些机构的根证书已经被浏览器信任，避免了手动导入证书的麻烦。
+
+因此，导入自签名的根证书是必要的，否则浏览器无法完全信任证书链，即使你导入了中间证书。
+
+### 通过 Keytool 生成密钥证书
+
+```shell
+❯ keytool -?
+密钥和证书管理工具
+
+命令:
+
+ -certreq            生成证书请求
+ -changealias        更改条目的别名
+ -delete             删除条目
+ -exportcert         导出证书
+ -genkeypair         生成密钥对
+ -genseckey          生成密钥
+ -gencert            根据证书请求生成证书
+ -importcert         导入证书或证书链
+ -importpass         导入口令
+ -importkeystore     从其他密钥库导入一个或所有条目
+ -keypasswd          更改条目的密钥口令
+ -list               列出密钥库中的条目
+ -printcert          打印证书内容
+ -printcertreq       打印证书请求的内容
+ -printcrl           打印 CRL 文件的内容
+ -storepasswd        更改密钥库的存储口令
+```
 
 https://docs.oracle.com/en/java/javase/11/tools/keytool.html
 
@@ -542,17 +668,22 @@ https://docs.oracle.com/en/java/javase/11/tools/keytool.html
 keytool -genkeypair -keystore root.jks -alias root -ext bc:c
 keytool -genkeypair -keystore ca.jks -alias ca -ext bc:c
 keytool -genkeypair -keystore server.jks -alias server
- 
+
+# A生成证书
 keytool -keystore root.jks -alias root -exportcert -rfc > root.pem
- 
+
+# B证书请求 ==> A生成证书
 keytool -storepass <passwd> -keystore ca.jks -certreq -alias ca |
     keytool -storepass <passwd> -keystore root.jks
     -gencert -alias root -ext BC=0 -rfc > ca.pem
+# B导入证书
 keytool -keystore ca.jks -importcert -alias ca -file ca.pem
- 
+
+# C证书请求 ==> B生成证书
 keytool -storepass <passwd> -keystore server.jks -certreq -alias server |
     keytool -storepass <passwd> -keystore ca.jks -gencert -alias ca
     -ext ku:c=dig,kE -rfc > server.pem
+# C导入证书
 cat root.pem ca.pem server.pem |
     keytool -keystore server.jks -importcert -alias server
 ```
@@ -560,27 +691,27 @@ cat root.pem ca.pem server.pem |
 生成密钥对和证书：
 
 ```shell
-# 生成根密钥对
+# 生成根密钥对 条目别名为root 存入root.jks密钥库 采用RSA算法 密钥库口令为123456 密钥口令为123456 有效期365天
 keytool -genkeypair -alias root -keystore root.jks -keyalg RSA -storepass 123456 -keypass 123456 -validity 365 -dname 'CN=LuJin, OU=CESI, O=CESI, L=Beijing, ST=Beijing, C=CN' -ext bc:c
 # 生成中间密钥对
 keytool -genkeypair -alias ca -keystore ca.jks -keyalg RSA -storepass 123456 -keypass 123456 -validity 365 -dname 'CN=LuJin, OU=CESI, O=CESI, L=Beijing, ST=Beijing, C=CN' -ext bc:c
 # 生成服务密钥对
 keytool -genkeypair -alias server -keystore server.jks -keyalg RSA -storepass 123456 -keypass 123456 -validity 365 -dname 'CN=LuJin, OU=CESI, O=CESI, L=Beijing, ST=Beijing, C=CN'
 
-# 导出根证书
+# 导出根证书 <== 根密钥条目
 keytool -exportcert -alias root -keystore root.jks -storepass 123456 -rfc > root.pem
 
-# 生成中间证书
+# 生成中间证书 <== 中间密钥条目 + 根密钥条目
 keytool -certreq -alias ca -keystore ca.jks -storepass 123456 | keytool -gencert -alias root -keystore root.jks -storepass 123456 -validity 365 -ext bc=0 -rfc > ca.pem
-# 拼接证书链
+# 拼接证书链 = 根证书 + 中间证书
 cat root.pem >> ca_chain.pem
 cat ca.pem >> ca_chain.pem
 # 中间密钥库导入证书链
 keytool -importcert -alias ca -keystore ca.jks -storepass 123456 -file ca_chain.pem
 
-# 生成服务证书 jdk15之前dns首字必须为字母
+# 生成服务证书 <== 服务密钥条目 + 中间密钥条目 jdk15之前dns首字必须为字母
 keytool -certreq -alias server -keystore server.jks -storepass 123456 | keytool -gencert -alias ca -keystore ca.jks -storepass 123456 -validity 365 -ext san=dns:localhost,dns:127.0.0.1,ip:127.0.0.1 -ext ku:c=dig,keyEncipherment -rfc > server.pem
-# 拼接证书链
+# 拼接证书链 = 根证书 + 中间证书 + 服务证书
 cat ca_chain.pem >> server_chain.pem
 cat server.pem >> server_chain.pem
 # 服务密钥库导入证书链

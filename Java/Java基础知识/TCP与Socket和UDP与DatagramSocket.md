@@ -9,3 +9,5 @@
 |     物理层      |            Manchester, MLT-3, 4A, PAM5, FE自协商             |
 
 ![img](./assets/webp.webp)
+
+PING 是基于 ICMP 实现的，所以不能走代理。
