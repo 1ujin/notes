@@ -568,6 +568,34 @@ install plugin rpl_semi_sync_slave soname 'semisync_slave.so';
 
 # 分库与分表
 
+# 优化
+
+1. 禁止使用`SELECT *`：不走覆盖索引，会产生回表；
+
+2. 小表驱动大表：`SELECT ... FROM '小表' JOIN '大表'`，因为需要先查出前者中的全部数据，所以前者应为小表、索引完备的表。其底层为 Join Buffer 缓冲区，其默认大小`innodb_buffer_pool_size`为 0x800000 = 8388608：
+
+   > `innodb_buffer_pool_size`
+   >
+   > - 定义：这个参数定义了 InnoDB 用于缓存数据和索引的总内存大小。它是 InnoDB 的主要内存结构，决定了可以缓存的数据量，从而影响数据库的性能。
+   > - 单位：以字节为单位，通常设置为系统内存的 70%-80%（对于数据库服务器）。
+   >
+   > `innodb_buffer_pool_chunk_size`
+   >
+   > - 定义：这个参数定义了缓冲池的分块大小。在 `innodb_buffer_pool_size` 被设置为大于 1GB 的值时，可以将缓冲池分成多个块，每个块的大小由 `innodb_buffer_pool_chunk_size` 定义。
+   > - 单位：以字节为单位，默认值通常是 128MB。
+
+3. 连接查询代替子查询；
+
+4. 提升`GROUP BY`的效率：被分组的列建立索引；
+
+5. 批量插入：单条插入每条都要连接数据库的 connection，SQL——`VALUES`，Mybatis——`<foreache>`，`ExecutorType.BATCH`。默认最大单次插入条数`max_allowed_packet`为 0x400000 = 4194304；
+
+6. 使用`LIMIT`；
+
+7. `UNION ALL`代替`UNION`：后者会去重，非要用则考虑提升查询本身的效率；
+
+8. 尽量少关联表；
+
 # Spring 中的数据源动态切换
 
 通过继承 `AbstractRoutingDataSource` 实现数据源动态切换是一个常见的做法。
