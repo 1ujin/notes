@@ -570,6 +570,12 @@ install plugin rpl_semi_sync_slave soname 'semisync_slave.so';
 
 # 分库与分表
 
+InnoDB 默认每页大小`innodb_page_size`为 16KB，其中页头页尾约占 200B，可供存储的部分约为 16184B。三层 B+ 树数据量计算：
+$$
+({16184 \over \text{主键字段大小}}) ^ 2 * {16184 \over \text{每行数据大小}}
+$$
+超过该数据量时建议分表。	
+
 # 优化
 
 1. 禁止使用`SELECT *`：不走覆盖索引，会产生回表；

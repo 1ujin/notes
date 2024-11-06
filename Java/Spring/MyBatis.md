@@ -335,9 +335,13 @@ mybatis.configuration.local-cache-scope=statement
 mybatis.configuration.cache-enabled=true
 ```
 
-## 一级缓存
+### 一级缓存
 
-又叫本地缓存 Local Cache，全局设置`mybatis.configuration.local-cache-scope=`，或在xml文件中`<setting name="localCacheScope" value="">`进行设置。
+又叫本地缓存 Local Cache，基于 PerpetualCache 的 HashMap，其存储作用域为 Session，当 Session flush 或 close 之后，该 Session 中的所有 Cache 就 将清空，默认打开一级缓存。
+
+全局设置`mybatis.configuration.local-cache-scope`，或在xml文件中`<setting name="localCacheScope" value="">`进行设置。
+
+![image.png](./assets/1737aa692d89cff4tplv-t2oaga2asx-jj-mark3024000q75.webp)
 
 MyBatis 利用本地缓存机制（Local Cache）防止循环引用和加速重复的嵌套查询。 默认值为 `SESSION`，会缓存一个会话中执行的所有查询，[会影响到同一个事务中的两次查询](https://zhuanlan.zhihu.com/p/151664093)。 若设置值为 `STATEMENT`，本地缓存将仅用于执行语句，对相同 SqlSession 的不同查询将不会进行缓存，可以看作是“关闭”了一级缓存。
 
@@ -347,7 +351,7 @@ MyBatis 利用本地缓存机制（Local Cache）防止循环引用和加速重�
 - mapper.xml 中的 statement（`<select>`、`<update>`、`<insert>`、`<delete>`标签）设置 `flushCache="true"` ，则查询之前先清空一级缓存，还是得查数据库；
 - 设置随机数，如果随机数的上限足够大，那随机到相同数的概率就足够低，也能类似的看成不同的数据库请求，那缓存的 key 都不一样，自然就不会匹配到缓存。
 
-## 二级缓存与第三方缓存库
+### 二级缓存与第三方缓存库
 
 本质就是实现缓存接口作为二级缓存，并持有缓存库。
 

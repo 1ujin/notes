@@ -381,7 +381,7 @@ public class Client {
 
 ### CGLIB
 
-CGLIB 动态代理是针对代理的类, 动态生成一个子类, 然后子类覆盖代理类中的方法, 如果是 private 或是 final 类修饰的方法,则不会被重写。同样，`@Transactional`注解只能应用在 public 方法上，如果应用在 protected、private 或 default 方法上，它不会报错，但是也不会有任何效果。
+CGLIB 动态代理是针对代理的类, 动态生成一个子类, 然后子类覆盖代理类中的方法, 如果是 private 或是 final 类修饰的方法,则不会被重写。同样，`@Transactional`注解**只能应用在 public 方法上**，如果应用在 protected、private 或 default 方法上，它不会报错，但是也不会有任何效果。
 
 CGLIB 是一个功能强大，高性能的代码生成包。它为没有实现接口的类提供代理，为 JDK 的动态代理提供了很好的补充。通常可以使用 Java 的动态代理创建代理，但当要代理的类没有实现接口或者为了更好的性能，CGLIB 是一个好的选择。
 
