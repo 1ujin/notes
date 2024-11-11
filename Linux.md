@@ -71,6 +71,51 @@ drwxr-xr-x.  21 root root root 4.0K 7月  31 03:51 var
 
 20. `/lost+found`：该目录用于存放系统异常时文件的碎片，以便于进行恢复。如果文件系统崩溃，则将在下次启动时执行文件系统检查。
 
+# find
+
+在 Linux 中，`find` 命令用于查找符合条件的文件或目录。`-context` 是 `find` 命令的一个选项，用来查找具有特定 SELinux 安全上下文的文件。
+
+### `-context` 选项
+
+`-context` 选项用于指定文件的 SELinux 上下文，或者用来过滤出符合某个 SELinux 安全上下文条件的文件。它允许你基于文件的 SELinux 上下文进行搜索。
+
+#### 格式：
+```bash
+find /path/to/search -context <context>
+```
+
+- `<context>` 是 SELinux 上下文字符串，通常包括用户、角色、类型和等级等信息。例如：`system_u:object_r:httpd_sys_content_t`。
+
+### 示例
+
+1. **查找特定 SELinux 上下文的文件**：
+   假设你想查找所有拥有 `httpd_sys_content_t` 类型的文件，你可以使用如下命令：
+   ```bash
+   find / -context system_u:object_r:httpd_sys_content_t
+   ```
+   这将返回所有具有 `httpd_sys_content_t` 类型的文件。
+
+2. **查找文件的 SELinux 上下文信息**：
+   你也可以用 `ls` 命令查看文件的 SELinux 上下文：
+   ```bash
+   ls -Z /path/to/file
+   ```
+   这样你就可以看到文件的 SELinux 上下文。
+
+### SELinux 上下文的组成：
+SELinux 上下文通常包含以下几部分：
+
+- **用户**（user）：标识文件的 SELinux 用户。
+- **角色**（role）：定义用户的权限。
+- **类型**（type）：定义文件或进程的类型（如 `httpd_sys_content_t`）。
+- **等级**（level）：控制文件的安全等级，通常与系统的安全级别相关。
+
+### 备注
+- `-context` 选项通常与 SELinux 系统一起使用，只有在启用了 SELinux 的 Linux 系统上才有效。
+- 在没有启用 SELinux 的系统上，`-context` 选项不会有任何效果。
+
+如果你的系统没有启用 SELinux，或者你没有设置 SELinux 安全上下文，这个选项将不会产生任何作用。
+
 # 目录 ls
 
 ![Linux各列信息详解](./assets/35fa2011af619f8312d0657fbd352dca.png)
