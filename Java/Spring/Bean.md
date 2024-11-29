@@ -201,7 +201,7 @@ AbstractAutowireCapableBeanFactory.class：
           - BeanFactoryAware
         - applyBeanPostProcessorsBeforeInitialization
           - postProcessBeforeInitializtion
-            - invokeAwareInterfaces 赋值其他字段，例如：`setApplicationContext(this.applicationContext)`
+            - invokeAwareInterfaces 赋值其他字段，例如：`((ApplicationContextAware) bean).setApplicationContext(this.applicationContext)`等设置各种实现了`Aware`接口的 bean
         - invokeInitMethods **初始化**
           - afterPropertiesSet 实现 InitializingBean 接口的初始化
           - invokeCustomInitMethod 调用自定义的初始化 init-method
@@ -1148,7 +1148,9 @@ Spring框架中，虽然`@Autowired`可以用于字段注入，但是并不推�
      
      2. 如果tempName是空的，将tempName设置为`@Resource`注解所在的成员变量或者方法的名字（注意如果方法名是setter，就去掉set并转成驼峰，比如`setUserService`方法，就会得到`userService`）；
      
-     3. 将tempName作为SpEL解析，得到最终的name，比如`@Resource(name="#{systemProperties['os.name']}")`，在Win10电脑上运行得到的最终name是“Windows 10”。![](https://pic1.zhimg.com/80/v2-d2a3124c342be266af460ac59c938ef4_720w.webp)
+     3. 将tempName作为SpEL解析，得到最终的name，比如`@Resource(name="#{systemProperties['os.name']}")`，在Win10电脑上运行得到的最终name是“Windows 10”。
+     
+        ![](https://pic1.zhimg.com/80/v2-d2a3124c342be266af460ac59c938ef4_720w.webp)
    
 - 如果不满足上面提到的两个条件，那么会走`@Autowired `的解析顺序。注意和`@Autowired`的区别，那就是`@Autowired`注解**只有一个`required`属性**，所以在处理`@Value`之后<u>按照**类型**找出所有可能的bean（不考虑泛型）</u>时，这个类型只能是`@Autowired`注解所在的字段或者方法参数的类型，而不能显示地指定类型。但是`@Resource`注解**有一个`type`属性**，如果指定了这个`type`属性，这个类型就是`type`属性值。![](https://pic1.zhimg.com/v2-2ed71f2f22240cfdad2ac06afe05e614_r.jpg)
 
