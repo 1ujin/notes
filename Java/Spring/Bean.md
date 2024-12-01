@@ -1297,6 +1297,61 @@ public class ServiceConfig {
 
 ## @Primary
 
+## @Order
+
+控制 bean 依赖注入的顺序，比如注入容器。
+
+如果您熟悉 Spring 中的面向切面编程 (AOP)，您就会意识到对切面进行排序的需求。 @Order 在这里非常简便。假设您有两个切面：LoggingAspect 和 SecurityAspect，并且您希望确保在安全检查之后进行日志记录。
+
+```java
+@Aspect
+@Order(2)
+@Component
+public class LoggingAspect {}
+
+@Aspect
+@Order(1)
+@Component
+public class SecurityAspect {}
+```
+
+在Spring框架中，`@Order` 注解和 `Ordered` 接口都是用于定义bean的排序优先级，主要用于影响Spring容器中bean的加载顺序（例如，处理器、拦截器、过滤器等的执行顺序）。但它们的优先级和应用场景有所不同。
+
+### 1. `@Order` 注解
+- `@Order` 是一个注解，通常用于标注在bean类上，指定该bean的优先级。Spring在处理这些bean时，会根据`@Order`的值来决定执行的顺序。值越小，优先级越高。
+- 示例：
+  ```java
+  @Component
+  @Order(1)
+  public class MyBean implements MyInterface {
+      // ...
+  }
+  ```
+
+### 2. `Ordered` 接口
+- `Ordered` 是一个接口，bean通过实现这个接口来指定优先级。`Ordered`接口有一个方法 `getOrder()`，返回一个整数值来表示优先级，数值越小优先级越高。
+- 示例：
+  ```java
+  @Component
+  public class MyBean implements MyInterface, Ordered {
+      @Override
+      public int getOrder() {
+          return 1;
+      }
+  }
+  ```
+
+### 优先级比较
+在Spring中，`@Order` 和 `Ordered` 的优先级是一样的，二者不会直接冲突。`@Order` 注解在Spring容器扫描时，会被自动转换为实现了 `Ordered` 接口的形式。也就是说，Spring在幕后会将 `@Order` 注解解析为一个 `Ordered` 实现。因此，最终它们的优先级和行为是等同的。
+
+如果一个bean既实现了 `Ordered` 接口，又使用了 `@Order` 注解，`@Order` 注解的优先级会生效。Spring会根据注解中的值来设置优先级。
+
+### 总结：
+- **`@Order` 注解** 的优先级会高于 **`Ordered` 接口**，如果两者都存在时，Spring会优先使用注解中的 `@Order` 值。
+- 如果仅使用 `Ordered` 接口，则会根据接口中的 `getOrder()` 方法来设置优先级。
+
+所以，简而言之，`@Order` 注解优先级高于 `Ordered` 接口的实现。
+
 ## @Lookup
 
 [Baeldung Quick Guide](https://www.baeldung.com/spring-lookup)
