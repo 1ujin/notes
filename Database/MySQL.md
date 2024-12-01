@@ -21,11 +21,27 @@
 ```mysql
 SELECT @@global.character_set_database;
 SELECT @@session.character_set_database;
-SELECT @@character_set_database;
+SELECT @@character_set_database; -- 等价于会话
 
 SHOW global variables LIKE 'character_set_database';
 SHOW session variables LIKE 'character_set_database';
-SHOW variables LIKE 'character_set_database';
+SHOW variables LIKE 'character_set_database'; -- 等价于会话
+```
+
+修改配置：
+
+```shell
+SET global transaction isolation level read committed;
+SET session transaction isolation level read committed;
+SET transaction isolation level read committed;
+
+SET global transaction_isolation='repeatable-read';
+SET session transaction_isolation='repeatable-read';
+SET transaction_isolation='repeatable-read';
+
+SET @@global.transaction_isolation='repeatable-read';
+SET @@session.transaction_isolation='repeatable-read';
+SET transaction_isolation='repeatable-read';
 ```
 
 
