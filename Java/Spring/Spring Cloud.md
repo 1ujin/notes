@@ -1082,7 +1082,7 @@ trace=org.apache.dubbo.rpc.protocol.dubbo.filter.TraceFilter
 
 ![dubbo添加过滤器 dubbo过滤器原理_dubbo添加过滤器_02](./assets/resize,m_fixed,w_1184.webp)
 
-## 扩展点
+## 扩展点 SPI
 
 例如配置系列化器的流程：
 
@@ -1570,6 +1570,10 @@ java "-Dserver.port=8718" "-Dcsp.sentinel.dashboard.server=localhost:8718" "-Dpr
 ## 信号量隔离
 
 ## 线程池隔离
+
+# Seata
+
+分布式事务
 
 # Sleuth
 

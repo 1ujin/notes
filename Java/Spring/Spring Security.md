@@ -139,7 +139,321 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
 # Filter
 
+## 过滤器链
+
+在 **Spring Security** 中，`originalChain.filters` 和 `additionalFilters` 是两个不同的过滤器链，用于描述过滤器在 Spring Security 过滤器链中的不同阶段和角色。理解这两个链的区别及其联系，有助于更好地定制和控制 Spring Security 的过滤器行为。
+
+### 1. **`originalChain.filters`**
+- **定义**：`originalChain.filters` 是 Spring Security 的 **默认过滤器链**，即 Spring Security 自身配置的一组过滤器。这些过滤器是由 Spring Security 自动注册的，包含了处理身份验证、授权、CSRF 保护、异常处理等常见安全任务的过滤器。
+- **过滤器内容**：`originalChain.filters` 包括了诸如以下过滤器（具体的过滤器根据配置可能有所不同）：
+  - `SecurityContextPersistenceFilter`：负责将请求和响应的安全上下文绑定到当前线程。
+  - `UsernamePasswordAuthenticationFilter`：处理基于用户名和密码的认证请求。
+  - `BasicAuthenticationFilter`：处理基本认证（HTTP Basic Authentication）。
+  - `ExceptionTranslationFilter`：处理异常和未授权访问，通常是 `403 Forbidden` 错误的处理。
+  - `FilterSecurityInterceptor`：执行访问控制的最后一步，确保用户是否有权限访问请求的资源。
+  
+  这些过滤器是 Spring Security 的核心部分，它们按照预设的顺序运行，以确保安全功能的实现。
+
+### 2. **`additionalFilters`**
+- **定义**：`additionalFilters` 是 **额外的过滤器链**，通常用于 **自定义过滤器**。它是 Spring Security 提供的一种机制，允许开发者在原有的 `originalChain.filters` 之外，添加自定义的过滤器。`additionalFilters` 使得你可以在 Spring Security 默认的过滤器链中插入额外的过滤逻辑，且通常可以控制这些过滤器在现有链中的顺序。
+- **使用场景**：
+  - 当你需要对请求进行额外的自定义处理时，例如进行日志记录、动态安全检查、请求数据修改等，可以将自定义过滤器添加到 `additionalFilters` 中。
+  - 这些过滤器通常可以添加到 Spring Security 过滤器链的 **任何位置**，甚至在 Spring Security 默认过滤器之前或之后。你可以通过 `HttpSecurity.addFilterBefore()` 或 `HttpSecurity.addFilterAfter()` 方法来控制自定义过滤器的插入位置。
+
+### 3. **`originalChain.filters` 和 `additionalFilters` 之间的关系**
+- **继承关系**：`originalChain.filters` 是 Spring Security 过滤器链的基础，包含了核心安全过滤器。`additionalFilters` 则是你可以在 `originalChain.filters` 上扩展的部分，通常用于向过滤器链中添加额外的自定义逻辑。
+- **过滤器插入**：`additionalFilters` 是可选的，并不是必须的。你可以选择是否在默认过滤器链 `originalChain.filters` 前后插入自定义过滤器，或者替换某些默认过滤器。
+  - 比如，Spring Security 允许你使用 `addFilterBefore()` 和 `addFilterAfter()` 方法，分别将自定义的过滤器插入到 `originalChain.filters` 中的某个特定过滤器之前或之后。
+  
+  ```java
+  @Configuration
+  public class SecurityConfig {
+  
+      @Bean
+      public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+          http
+              .addFilterBefore(new MyCustomFilter(), UsernamePasswordAuthenticationFilter.class)
+              .addFilterAfter(new AnotherCustomFilter(), BasicAuthenticationFilter.class);
+  
+          return http.build();
+      }
+  }
+  ```
+  
+  在这个例子中：
+  - `MyCustomFilter` 会被添加到 `UsernamePasswordAuthenticationFilter` 之前。
+  - `AnotherCustomFilter` 会被添加到 `BasicAuthenticationFilter` 之后。
+
+### 4. **它们的联系**
+- **协同工作**：`originalChain.filters` 和 `additionalFilters` 在 Spring Security 过滤器链中协同工作。`originalChain.filters` 提供了 Spring Security 的基本功能，而 `additionalFilters` 则提供了用户自定义的扩展功能。它们的顺序和执行逻辑可以通过 `FilterRegistrationBean` 或 `HttpSecurity` 的配置方法来进行定制。
+- **定制顺序**：你可以通过 `addFilterBefore()` 或 `addFilterAfter()` 将 `additionalFilters` 插入到 `originalChain.filters` 中的任意位置，或者你也可以通过 `FilterRegistrationBean.setOrder()` 来明确控制过滤器的执行顺序。`additionalFilters` 本质上是对 `originalChain.filters` 的补充或扩展。
+
+### 5. **示例：组合 `originalChain.filters` 和 `additionalFilters`**
+假设你有一个自定义过滤器，想要在 Spring Security 的默认过滤器链中添加它，且希望它在 `UsernamePasswordAuthenticationFilter` 之前执行：
+
+```java
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // 添加自定义过滤器 MyCustomFilter 到 UsernamePasswordAuthenticationFilter 之前
+            .addFilterBefore(new MyCustomFilter(), UsernamePasswordAuthenticationFilter.class)
+            
+            // 其他配置
+            .authorizeRequests()
+                .antMatchers("/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated();
+
+        return http.build();
+    }
+
+    // 自定义过滤器
+    public class MyCustomFilter extends OncePerRequestFilter {
+        @Override
+        protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+                throws ServletException, IOException {
+            // 自定义的过滤逻辑
+            filterChain.doFilter(request, response);
+        }
+    }
+}
+```
+
+在这个例子中：
+- `originalChain.filters` 包含了 Spring Security 默认的过滤器链。
+- `MyCustomFilter` 是 `additionalFilters` 中的一个自定义过滤器，它被添加到 `UsernamePasswordAuthenticationFilter` 之前。
+
+### 总结
+
+- **`originalChain.filters`**：是 Spring Security 的默认过滤器链，包含核心的安全过滤器，如身份验证、授权等。
+- **`additionalFilters`**：是一个自定义过滤器链，用于扩展和定制 Spring Security 的默认过滤器链。可以通过 `addFilterBefore()` 和 `addFilterAfter()` 来控制自定义过滤器的位置。
+- **它们的联系**：`additionalFilters` 可以在 `originalChain.filters` 上进行扩展或插入自定义逻辑，且两者的顺序和执行流程可以通过 Spring Security 配置来控制。
+
+通过这种方式，Spring Security 提供了灵活的机制来让开发者自定义和扩展安全逻辑，同时保持默认安全过滤器链的有效性。
+
+## 过滤器顺序
+
+要控制 **Spring Security 过滤器链**（`originalChain.filters` 和 `additionalFilters`）中的过滤器顺序，你应该使用 **`FilterRegistrationBean` 的 `setOrder()` 方法**，而不是 `@Order` 注解。原因在于 Spring Security 的过滤器链由多个内部过滤器（如 `UsernamePasswordAuthenticationFilter`、`BasicAuthenticationFilter` 等）组成，它们的顺序由 Spring Security 的配置和注册方式决定。
+
+### Spring Security 过滤器链控制
+
+在 Spring Security 中，所有的过滤器都是按照一定的顺序在过滤器链中执行的。默认情况下，Spring Security 提供的过滤器会按特定的顺序排列，但如果你想调整自定义过滤器在 Spring Security 过滤器链中的位置，你可以使用 `FilterRegistrationBean` 来注册过滤器并设置 `setOrder()` 来控制它们的顺序。
+
+#### 1. 自定义过滤器插入到 Spring Security 过滤器链中
+
+Spring Security 的过滤器链包含一系列过滤器，如 `SecurityContextPersistenceFilter`、`UsernamePasswordAuthenticationFilter` 等。你可以通过 `FilterRegistrationBean` 来注册你的自定义过滤器，并通过 `setOrder()` 来确定它们在过滤器链中的执行顺序。
+
+### 如何插入自定义过滤器并控制顺序
+
+Spring Security 本身会在一些关键位置注册过滤器，如：
+- `UsernamePasswordAuthenticationFilter`
+- `BasicAuthenticationFilter`
+- `ExceptionTranslationFilter`
+
+如果你想自定义过滤器，并确保它按正确的顺序添加到 Spring Security 的过滤器链中，你可以在 `SecurityFilterChain` 配置类中使用 `addFilterBefore()` 或 `addFilterAfter()` 方法来指定过滤器的执行顺序。
+
+#### 示例：通过 `SecurityFilterChain` 控制顺序
+
+```java
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .addFilterBefore(myCustomFilter(), UsernamePasswordAuthenticationFilter.class) // 在 UsernamePasswordAuthenticationFilter 之前
+            .addFilterAfter(anotherCustomFilter(), BasicAuthenticationFilter.class); // 在 BasicAuthenticationFilter 之后
+        return http.build();
+    }
+
+    @Bean
+    public Filter myCustomFilter() {
+        return new MyCustomFilter();
+    }
+
+    @Bean
+    public Filter anotherCustomFilter() {
+        return new AnotherCustomFilter();
+    }
+}
+```
+
+在上述例子中：
+- `addFilterBefore()` 将 `myCustomFilter` 添加到 `UsernamePasswordAuthenticationFilter` 之前执行。
+- `addFilterAfter()` 将 `anotherCustomFilter` 添加到 `BasicAuthenticationFilter` 之后执行。
+
+### 2. 使用 `FilterRegistrationBean` 控制 Spring Security 过滤器顺序
+
+你也可以使用 `FilterRegistrationBean` 来注册你的过滤器，并使用 `setOrder()` 来设置它们在过滤器链中的顺序。 `setOrder()` 的值越小，过滤器优先级越高。通过这种方式，你可以精确控制自定义过滤器在 Spring Security 过滤器链中的位置。
+
+```java
+@Bean
+public FilterRegistrationBean<MyCustomFilter> loggingFilter() {
+    FilterRegistrationBean<MyCustomFilter> registrationBean = new FilterRegistrationBean<>();
+    registrationBean.setFilter(new MyCustomFilter());
+    registrationBean.addUrlPatterns("/api/*");  // 设置过滤的 URL 模式
+    registrationBean.setOrder(1);  // 设置过滤器执行顺序，数字越小优先级越高
+    return registrationBean;
+}
+```
+
+这里的 `setOrder(1)` 控制了 `MyCustomFilter` 的执行顺序。如果你有多个过滤器，这种方式可以控制它们的顺序。
+
+### 3. `@Order` 注解的作用
+
+`@Order` 注解通常用于控制 Spring 容器管理的 Bean 的顺序，对于 Spring Security 的过滤器链（`originalChain.filters` 和 `additionalFilters`）的顺序，它并不起决定性作用。 `@Order` 适用于 Spring 管理的普通 Bean 排序，而不会直接影响 Spring Security 过滤器的顺序。
+
+### 结论
+
+- 要控制 **Spring Security 过滤器链** 中的过滤器顺序，应该使用 `SecurityFilterChain` 中的 `addFilterBefore()` 或 `addFilterAfter()` 方法，或者使用 `FilterRegistrationBean` 的 `setOrder()` 方法来精确控制过滤器的执行顺序。
+- `@Order` 注解主要用于声明式地控制 Spring Bean 的排序，但它不会直接影响 Spring Security 过滤器链的顺序。
+
 # WebSecurity
+
+## originalChain
+
+**添加方式：**
+
+1. `WebSecurity`的`securityInterceptor()`方法（`WebSecurity`是基于 Servlet Filter 用来配置）
+2. 通过`FilterRegistrationBean`包裹成新的 bean
+
+**排序依据：**
+
+1. 实现`Ordered`接口的`getOrder()`方法
+2. `@Order`注解
+3. `FilterRegistrationBean`的`setOrder()`方法
+
+生成流程：
+
+TomcatStarter → ServletWebServerApplicationContext → FilterRegistrationBean::addRegistration → ApplicationContext::addFilter
+
+spring.factories
+
+```
+org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.HttpEncodingAutoConfiguration,\
+```
+
+HttpEncodingAutoConfiguration.java
+
+```java
+// -2147483648
+@Bean
+@ConditionalOnMissingBean
+public CharacterEncodingFilter characterEncodingFilter() {
+   CharacterEncodingFilter filter = new OrderedCharacterEncodingFilter();
+   filter.setEncoding(this.properties.getCharset().name());
+   filter.setForceRequestEncoding(this.properties.shouldForce(Type.REQUEST));
+   filter.setForceResponseEncoding(this.properties.shouldForce(Type.RESPONSE));
+   return filter;
+}
+```
+
+WebMvcAutoConfiguration.java
+
+```java
+// -10000
+@Bean
+@ConditionalOnMissingBean(HiddenHttpMethodFilter.class)
+@ConditionalOnProperty(prefix = "spring.mvc.hiddenmethod.filter", name = "enabled", matchIfMissing = true)
+public OrderedHiddenHttpMethodFilter hiddenHttpMethodFilter() {
+    return new OrderedHiddenHttpMethodFilter();
+}
+
+// -9900
+@Bean
+@ConditionalOnMissingBean(FormContentFilter.class)
+@ConditionalOnProperty(prefix = "spring.mvc.formcontent.filter", name = "enabled", matchIfMissing = true)
+public OrderedFormContentFilter formContentFilter() {
+    return new OrderedFormContentFilter();
+}
+
+// -105
+@Bean
+@ConditionalOnMissingBean({ RequestContextListener.class, RequestContextFilter.class })
+@ConditionalOnMissingFilterBean(RequestContextFilter.class)
+public static RequestContextFilter requestContextFilter() {
+   return new OrderedRequestContextFilter();
+}
+```
+
+## additionalFilters
+
+**添加方式：`HttpSecurity`的`addFilter()`方法**
+
+**排序依据：比较器`FilterComparator`中的哈希表和`setFilterAt()`**
+
+生成流程：
+
+@EnableWebSecurity → WebSecurityConfiguration → @Bean("springSecurityFilterChain") → WebSecurity::build → WebSecurity::doBuild → WebSecurity::performBuild → WebSecurity::init → 自定义配置类 WebSecurityConfigurerAdapter::init →  WebSecurityConfigurerAdapter::getHttp → 创建 HttpSecurity → 自定义配置类中向 HttpSecurity 中添加过滤器 addFilter → HttpSecurity::performBuild → Collections::sort 实现比较器对比并排序 → DefaultSecurityFilterChain
+
+WebSecurityConfiguration.java
+
+```java
+@Bean(name = AbstractSecurityWebApplicationInitializer.DEFAULT_FILTER_NAME) // springSecurityFilterChain
+public Filter springSecurityFilterChain() throws Exception {
+	boolean hasConfigurers = webSecurityConfigurers != null
+			&& !webSecurityConfigurers.isEmpty();
+	if (!hasConfigurers) {
+		WebSecurityConfigurerAdapter adapter = objectObjectPostProcessor
+				.postProcess(new WebSecurityConfigurerAdapter() {
+				});
+		webSecurity.apply(adapter);
+	}
+	return webSecurity.build();
+}
+```
+
+FilterComparator.java
+
+```
+FilterComparator() {
+    Step order = new Step(INITIAL_ORDER, ORDER_STEP);
+    put(ChannelProcessingFilter.class, order.next());
+    put(ConcurrentSessionFilter.class, order.next());
+    put(WebAsyncManagerIntegrationFilter.class, order.next());
+    put(SecurityContextPersistenceFilter.class, order.next());
+    put(HeaderWriterFilter.class, order.next());
+    put(CorsFilter.class, order.next());
+    put(CsrfFilter.class, order.next());
+    put(LogoutFilter.class, order.next());
+    filterToOrder.put(
+        "org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter",
+            order.next());
+    put(X509AuthenticationFilter.class, order.next());
+    put(AbstractPreAuthenticatedProcessingFilter.class, order.next());
+    filterToOrder.put("org.springframework.security.cas.web.CasAuthenticationFilter", order.next());
+    filterToOrder.put(
+        "org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter",
+            order.next());
+    put(UsernamePasswordAuthenticationFilter.class, order.next());
+    put(ConcurrentSessionFilter.class, order.next());
+    filterToOrder.put("org.springframework.security.openid.OpenIDAuthenticationFilter", order.next());
+    put(DefaultLoginPageGeneratingFilter.class, order.next());
+    put(DefaultLogoutPageGeneratingFilter.class, order.next());
+    put(ConcurrentSessionFilter.class, order.next());
+    put(DigestAuthenticationFilter.class, order.next());
+    filterToOrder.put(
+        "org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationFilter", order.next());
+    put(BasicAuthenticationFilter.class, order.next());
+    put(RequestCacheAwareFilter.class, order.next());
+    put(SecurityContextHolderAwareRequestFilter.class, order.next());
+    put(JaasApiIntegrationFilter.class, order.next());
+    put(RememberMeAuthenticationFilter.class, order.next());
+    put(AnonymousAuthenticationFilter.class, order.next());
+    filterToOrder.put(
+        "org.springframework.security.oauth2.client.web.OAuth2AuthorizationCodeGrantFilter",
+            order.next());
+    put(SessionManagementFilter.class, order.next());
+    put(ExceptionTranslationFilter.class, order.next());
+    put(FilterSecurityInterceptor.class, order.next());
+    put(SwitchUserFilter.class, order.next());
+}
+```
+
+
 
 # WebFluxSecurity
 
@@ -215,7 +529,7 @@ public class MyWebFluxSecurityConfiguration {
                 // .loginPage("/login").and()
                 .logout().logoutUrl("/logout").and()
                 .csrf().csrfTokenRepository(CookieServerCsrfTokenRepository.withHttpOnlyFalse()).and()
-                .cors().disable()
+                .cors().disable() // 不加入corsFilter
                 .httpBasic().disable()
                 .build();
     }
@@ -312,7 +626,7 @@ public class MyWebFluxSecurityConfig {
 }
 ```
 
-上述 SecurityWebFilterChain 的实现类为 MatcherSecurityWebFilterChain，向其内部填充过滤器：
+上述 SecurityWebFilterChain 的实现类为 MatcherSecurityWebFilterChain，由 ServerHttpSecurity 向其内部填充过滤器：
 
 ```java
 public SecurityWebFilterChain build() {
@@ -348,6 +662,99 @@ public SecurityWebFilterChain build() {
     // ServerWebExchangeReactorContextWebFilter 没有实现 Ordered 不能排序，直接放入列表头
     sortedWebFilters.add(0, new ServerWebExchangeReactorContextWebFilter());
     return new MatcherSecurityWebFilterChain(getSecurityMatcher(), sortedWebFilters);
+}
+```
+
+其中每一个过滤器类似如下方式通过`ServerHttpSecurity`加入`additionalFilters`：
+
+```java
+public CorsSpec cors() {
+    if (this.cors == null) {
+        this.cors = new CorsSpec();
+    }
+    return this.cors;
+}
+
+/**
+ * Configures CORS support within Spring Security. This ensures that the {@link CorsWebFilter} is place in the
+ * correct order.
+ */
+public class CorsSpec {
+    private CorsWebFilter corsFilter;
+
+    /**
+     * Configures the {@link CorsConfigurationSource} to be used
+     * @param source the source to use
+     * @return the {@link CorsSpec} for additional configuration
+     */
+    public CorsSpec configurationSource(CorsConfigurationSource source) {
+        this.corsFilter = new CorsWebFilter(source);
+        return this;
+    }
+
+    /**
+     * Disables CORS support within Spring Security.
+     * @return the {@link ServerHttpSecurity} to continue configuring
+     */
+    public ServerHttpSecurity disable() {
+        ServerHttpSecurity.this.cors = null;
+        return ServerHttpSecurity.this;
+    }
+
+    /**
+     * Allows method chaining to continue configuring the {@link ServerHttpSecurity}
+     * @return the {@link ServerHttpSecurity} to continue configuring
+     */
+    public ServerHttpSecurity and() {
+        return ServerHttpSecurity.this;
+    }
+
+    protected void configure(ServerHttpSecurity http) {
+        CorsWebFilter corsFilter = getCorsFilter();
+        if (corsFilter != null) {
+            http.addFilterAt(this.corsFilter, SecurityWebFiltersOrder.CORS);
+        }
+    }
+
+    private CorsWebFilter getCorsFilter() {
+        if (this.corsFilter != null) {
+            return this.corsFilter;
+        }
+
+        // 此处需要 CORS 配置 Bean
+        CorsConfigurationSource source = getBeanOrNull(CorsConfigurationSource.class);
+        if (source == null) {
+            return null;
+        }
+        CorsProcessor processor = getBeanOrNull(CorsProcessor.class);
+        if (processor == null) {
+            processor = new DefaultCorsProcessor();
+        }
+        this.corsFilter = new CorsWebFilter(source, processor);
+        return this.corsFilter;
+    }
+
+    private CorsSpec() {}
+}
+```
+
+启用后还要配置 CORS：
+
+```java
+// 自定义 CORS 配置
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration corsConfig = new CorsConfiguration();
+    corsConfig.addAllowedOrigin("http://example.com");  // 设置允许的来源
+    corsConfig.addAllowedMethod("GET");  // 设置允许的请求方法
+    corsConfig.addAllowedMethod("POST");
+    corsConfig.addAllowedHeader("*");  // 允许任意请求头
+    corsConfig.setAllowCredentials(true);
+
+    // 返回一个 CorsConfigurationSource 实例
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", corsConfig);
+    return source;
 }
 ```
 

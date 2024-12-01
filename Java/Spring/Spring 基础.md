@@ -147,7 +147,7 @@ public SpringApplication(ResourceLoader resourceLoader, Class<?>... primarySourc
 ```
 
 1. 初始化 SpringApplication：`new SpringApplication(primarySources)`
-   1. 将启动类放入`primarySources`
+   1. 将启动类放入`primarySources`，这是最初的 bean 类型数组
    2. 推算当前 web 应用类型`webApplicationType`（Servlet 还是 Reactive）
    3. `getSpringFactoriesInstances`读取`Bootstrapper`引导类，使用给定的类加载器从`META-INF/spring.factories`加载给定类型的工厂实现的完全限定类名（自动装配，约定优于配置）
    4. `getSpringFactoriesInstances`读取`ApplicationContextInitializer`应用上下文初始化器，使用给定的类加载器从`META-INF/spring.factories`加载给定类型的工厂实现的完全限定类名
