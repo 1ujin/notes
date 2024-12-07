@@ -45,7 +45,7 @@ spring.profiles.include可以加载多个yml文件，参考：[spring.profiles.a
 
 Spring的生命周期不仅涉及到Bean的创建和销毁，还包括整个Spring容器的生命周期。从Spring容器的启动、初始化、管理Bean，到最终关闭和销毁，这个过程涉及多层机制的协同运作。要了解Spring的生命周期，就必须从Spring容器的启动与关闭，以及容器中Bean的创建和管理两个方面进行讲解。
 
-## Spring生命周期的主要环节如下：
+## Spring生命周期
 
 ---
 
@@ -246,8 +246,8 @@ SpringBoot application.xml 中的配置：
 
 - 核心线程空闲：客户端连接 → 核心线程执行
 - 核心线程满，队列空闲：客户端连接 → taskQueue → 核心线程执行
-- 核心线程满，队列满，最大线程空闲：客户端连接 → taskQueue 入队尾，其他任务出队首 → 增加额外线程执行
 - 核心线程满，队列空闲，最大线程满：客户端连接 → taskQueue 入队尾 → 等待核心或 maxThreads 空闲
+- 核心线程满，队列满，最大线程空闲，acceptCount 空闲：客户端连接 → acceptCount 入队 → 等待核心或 taskQueue 或 maxThreads 空闲
 - 核心线程满，队列满，最大线程满，acceptCount 空闲：客户端连接 → acceptCount 入队 → 等待核心或 taskQueue 或 maxThreads 空闲
 - 核心线程满，队列满，最大线程满，acceptCount 满，最大连接空闲：客户端连接 → 拒绝503错误（已建立连接可重试）
 - 无其他前提，最大连接满：客户端连接 → 拒绝503错误（未建立连接不可重试）
