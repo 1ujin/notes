@@ -496,6 +496,24 @@ SELECT * FROM table_name IGNORE INDEX(index_list);
 - ‌**有效利用索引的查询**‌：`SELECT * FROM table WHERE A = 1 AND B = 2 AND C > 3`：这种情况下，A和B可以使用索引，但C不会使用索引，因为C是范围查询。
 - ‌**无效利用索引的查询**‌：`SELECT * FROM table WHERE B = 2 AND C = 3`：这种情况下，B和C都不会使用索引，因为查询不是从联合索引的最左边开始的。
 
+### Explain
+
+`type`：system > const > eq_ref > ref > range > index > ALL
+
+- `system`：该表只有一行（系统表）。这是 const 联接类型的特例；
+- `const`：命中主键或者唯一索引被连接的部分是一个常量值；
+- `eq_ref`：
+  - 联表（join）查询；
+  - 命中主键（primary key）或者非空唯一索引（unique not null）；
+  - 等值连接
+- `ref`：
+  - 联表（join）查询；
+  - 单表查询；
+  - 联表查询普通非唯一索引；
+- `range`：索引上的范围查询，会在索引上扫码特定范围内的值；
+- `index`：扫描索引上的全部数据，仅比全表扫描快一点；
+- `ALL`：id 上不建索引，则全表扫描。
+
 # 事务
 
 ## 隔离级别
