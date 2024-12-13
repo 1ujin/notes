@@ -496,7 +496,7 @@ SELECT * FROM table_name IGNORE INDEX(index_list);
 - ‌**有效利用索引的查询**‌：`SELECT * FROM table WHERE A = 1 AND B = 2 AND C > 3`：这种情况下，A和B可以使用索引，但C不会使用索引，因为C是范围查询。
 - ‌**无效利用索引的查询**‌：`SELECT * FROM table WHERE B = 2 AND C = 3`：这种情况下，B和C都不会使用索引，因为查询不是从联合索引的最左边开始的。
 
-### Explain
+### 执行计划 Explain
 
 `type`：system > const > eq_ref > ref > range > index > ALL
 
